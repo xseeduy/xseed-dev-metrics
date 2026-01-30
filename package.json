@@ -1,0 +1,53 @@
+{
+  "name": "xseed-dev-metrics",
+  "version": "1.0.0",
+  "description": "Xseed Developer Metrics CLI - Track productivity across Git, Jira & Linear",
+  "main": "dist/index.js",
+  "bin": {
+    "xseed-metrics": "./dist/index.js",
+    "gdm": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "lint": "eslint src/**/*.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "xseed",
+    "git",
+    "jira",
+    "linear",
+    "metrics",
+    "developer",
+    "productivity",
+    "devex",
+    "space-framework",
+    "cli"
+  ],
+  "author": "Xseed Solutions",
+  "license": "MIT",
+  "dependencies": {
+    "@notionhq/client": "^5.9.0",
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.5",
+    "commander": "^12.1.0",
+    "date-fns": "^3.6.0",
+    "node-cron": "^3.0.3",
+    "ora": "^5.4.1",
+    "simple-git": "^3.27.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/node-cron": "^3.0.11",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xseed-solutions/dev-metrics-cli"
+  }
+}
