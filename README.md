@@ -98,12 +98,82 @@ export NOTION_AUTO_UPLOAD="true"
 
 | Command | Description |
 |---------|-------------|
-| `gdm init` | Interactive setup wizard |
+| `gdm init` | Interactive setup wizard (add/update client) |
 | `gdm collect` | Collect metrics from repositories |
 | `gdm show` | View collected historical metrics |
 | `gdm status` | Show configuration status |
 | `gdm daemon start` | Enable automatic weekly collection |
-| `gdm clean` | Delete all configuration and data |
+| `gdm clean` | Delete configuration and/or data |
+
+### Client Management Commands
+
+| Command | Description |
+|---------|-------------|
+| `gdm client` | List all configured clients |
+| `gdm client:switch <name>` | Switch active client |
+| `gdm client:remove <name>` | Remove a client |
+
+## 👥 Managing Multiple Clients
+
+The CLI supports managing multiple clients (organizations/projects) with separate configurations, repositories, and data.
+
+### Adding a New Client
+
+Run `gdm init` to create or update a client:
+
+```bash
+gdm init
+```
+
+If a client with that name already exists, you'll be asked if you want to reconfigure it or create a new client.
+
+### Switching Between Clients
+
+Set which client is active (used for collect, status, etc.):
+
+```bash
+gdm client:switch CLIENT_B
+```
+
+### Listing All Clients
+
+View all configured clients and their status:
+
+```bash
+gdm client
+```
+
+Output example:
+```
+★ CLIENT_A (active)
+    Repositories: 3
+    Git: ✓ john.doe
+    Integrations: Git, Jira, Notion
+    
+  CLIENT_B
+    Repositories: 1
+    Git: ✓ jane.smith
+    Integrations: Git, Linear
+```
+
+### Collecting for a Specific Client
+
+By default, `gdm collect` uses the active client. To collect for a different client:
+
+```bash
+gdm collect --client CLIENT_B
+```
+
+### Repository Ownership
+
+When you run `gdm collect` in an unconfigured repository, you'll be prompted:
+
+```
+Repository not configured: /path/to/repo
+? Add to client 'CLIENT_A'? [Y/n]
+```
+
+Repositories can belong to multiple clients if needed (useful for shared libraries).
 
 **What `gdm collect` does:** pulls the latest from the repo, gathers Git metrics (commits, lines, activity, trends) for the configured user, optionally Jira metrics, and saves a snapshot to `~/.xseed-metrics/data/`. By default it collects **from 90 days ago until today**. You can change the range:
 
@@ -176,34 +246,47 @@ Configuration is stored in `~/.xseed-metrics/config.json`:
 
 ```json
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "initialized": true,
-  "git": {
-    "username": "John Doe",
-    "email": "john@company.com",
-    "mainBranch": "main"
-  },
-  "repositories": ["/path/to/repo"],
-  "jira": {
-    "url": "https://company.atlassian.net",
-    "email": "john@company.com",
-    "token": "your_api_token"
-  },
-  "linear": {
-    "apiKey": "lin_api_xxxxx"
-  },
-  "notion": {
-    "enabled": true,
-    "apiKey": "secret_xxxxx",
-    "parentPageId": "page_id_xxxxx",
-    "clientName": "Acme Corp",
-    "autoUploadOnSchedule": true
-  },
-  "scheduler": {
-    "enabled": true,
-    "interval": "weekly",
-    "dayOfWeek": 1,
-    "time": "09:00"
+  "activeClient": "CLIENT_A",
+  "clients": {
+    "CLIENT_A": {
+      "git": {
+        "username": "John Doe",
+        "email": "john@company.com",
+        "mainBranch": "main"
+      },
+      "repositories": ["/path/to/repo1"],
+      "jira": {
+        "url": "https://company.atlassian.net",
+        "email": "john@company.com",
+        "token": "your_api_token"
+      },
+      "notion": {
+        "enabled": true,
+        "apiKey": "secret_xxxxx",
+        "parentPageId": "page_id_xxxxx",
+        "clientName": "Acme Corp",
+        "autoUploadOnSchedule": true
+      },
+      "scheduler": {
+        "enabled": true,
+        "interval": "weekly",
+        "dayOfWeek": 1,
+        "time": "09:00"
+      }
+    },
+    "CLIENT_B": {
+      "git": {
+        "username": "Jane Smith",
+        "email": "jane@example.com",
+        "mainBranch": "main"
+      },
+      "repositories": ["/path/to/repo2"],
+      "linear": {
+        "apiKey": "lin_api_xxxxx"
+      }
+    }
   }
 }
 ```
@@ -313,35 +396,87 @@ When `autoUploadOnSchedule: true`, the weekly cron job automatically uploads wit
 
 ## 📁 Data Storage
 
-Collected metrics are stored in `~/.xseed-metrics/data/`:
+Collected metrics are stored per-client in `~/.xseed-metrics/`:
 
 ```
 ~/.xseed-metrics/
-├── config.json          # Configuration
+├── config.json          # Multi-client configuration
 ├── data/
-│   ├── repo-name_2025-01-29.json
-│   ├── repo-name_2025-01-22.json
-│   └── ...
+│   ├── CLIENT_A/
+│   │   ├── repo-name_2025-01-29.json
+│   │   ├── repo-name_2025-01-22.json
+│   │   └── ...
+│   └── CLIENT_B/
+│       ├── repo-name_2025-01-30.json
+│       └── ...
 └── logs/
-    └── daemon.log       # Scheduler logs
+    ├── CLIENT_A/
+    │   └── daemon.log
+    └── CLIENT_B/
+        └── daemon.log
 ```
 
-### Cleaning Data
+Each client has its own isolated data and logs directories.
 
-To remove all configuration and collected data:
+### Selective Cleaning
+
+The `gdm clean` command supports selective cleaning of specific resources:
+
+#### Clean Data Only
+
+Remove collected metrics while keeping configuration:
 
 ```bash
-gdm clean
+gdm clean --data                      # Clean active client's data
+gdm clean --data --client CLIENT_A    # Clean specific client's data
 ```
 
-This command will:
-- Stop the daemon if it's running
-- Delete all configuration files (`config.json`)
-- Delete all collected metrics data
-- Delete all daemon logs
-- Remove daemon state files (PID, scheduler state)
+#### Clean Logs Only
 
-⚠️ **Warning**: This action is permanent and cannot be undone. After cleaning, run `gdm init` to set up again.
+Remove log files:
+
+```bash
+gdm clean --logs                      # Clean active client's logs
+gdm clean --logs --client CLIENT_B    # Clean specific client's logs
+```
+
+#### Clean Configuration Only
+
+Remove client configuration (keeps data and logs):
+
+```bash
+gdm clean --config                    # Remove active client config
+gdm clean --config --client CLIENT_A  # Remove specific client config
+```
+
+#### Clean Everything
+
+Remove all configuration, data, and logs:
+
+```bash
+gdm clean --all                       # Requires confirmation
+gdm clean --all --yes                 # Skip confirmation
+```
+
+#### Combined Cleaning
+
+Mix flags for custom cleanup:
+
+```bash
+gdm clean --data --logs               # Clean data and logs for active client
+gdm clean --data --config --client CLIENT_A  # Remove CLIENT_A entirely
+```
+
+#### Removing a Client
+
+To completely remove a client and all its data:
+
+```bash
+gdm client:remove CLIENT_A            # Removes config only (prompts for confirmation)
+gdm clean --config --data --logs --client CLIENT_A  # Removes everything
+```
+
+⚠️ **Warning**: Cleaning operations are permanent and cannot be undone. The command will prompt for confirmation unless `--yes` is used.
 
 ## 🔄 Workflow Example
 

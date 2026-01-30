@@ -66,17 +66,26 @@ CLI command implementations. Each file typically exports one or more command han
 | File | Purpose |
 |------|---------|
 | `index.ts` | Git analysis commands: summary, authors, commits, activity, files, trends, blame, report, types. Uses `GitMetrics` and formatters. |
-| `init.ts` | Interactive and non-interactive setup wizard; writes config via `config/integrations`. |
-| `collect.ts` | Collects metrics from configured repos (git pull, GitMetrics, optional Jira), saves to `~/.xseed-metrics/data/`. |
-| `show.ts` | Displays historical collected data from the data directory. |
-| `daemon.ts` | Daemon/scheduler: start, stop, status, logs, run. Manages cron for weekly/daily collection. |
+| `init.ts` | Interactive and non-interactive setup wizard; adds/updates clients, writes config via `config/integrations`. Supports multi-client creation and repository validation. |
+| `collect.ts` | Collects metrics from configured repos (git pull, GitMetrics, optional Jira), saves to client-specific `~/.xseed-metrics/data/CLIENT_NAME/`. Supports `--client` flag for targeting specific clients. |
+| `show.ts` | Displays historical collected data from the client-specific data directory. Supports `--client` flag. |
+| `clean.ts` | Selective cleaning with `--data`, `--config`, `--logs`, `--client`, `--all`, `--yes` flags. Removes configuration and/or data for specific clients or everything. |
+| `client.ts` | Client management commands: list all clients, switch active client, remove clients. |
+| `daemon.ts` | Daemon/scheduler: start, stop, status, logs, run. Manages cron for weekly/daily collection. Works with active client. |
 | `config.ts` | Integration config: check, init, test connections. |
 | `jira.ts` | `gdm jira -p PROJECT` — Jira project metrics. |
 | `linear.ts` | `gdm linear -t TEAM` — Linear team metrics. |
 
 ### `src/config/`
 
-- **`integrations.ts`** — Single source for app config: read/write `~/.xseed-metrics/config.json`, env overrides, paths (config dir, data dir, logs dir). Exposes `getConfig`, `getJiraConfig`, `getLinearConfig`, `getGitConfig`, `isInitialized`, `getConfigStatus`, `saveConfig`, and specific setters.
+- **`integrations.ts`** — Single source for multi-client app config: read/write `~/.xseed-metrics/config.json`, env overrides, client-specific paths (config dir, data dir per client, logs dir per client). Exposes:
+  - Config getters: `getConfig()` (active client), `getClientConfig(name)`, `getFullConfig()`, `getActiveClient()`, `getAllClients()`
+  - Integration getters: `getJiraConfig()`, `getLinearConfig()`, `getGitConfig()`, `getNotionConfig()`
+  - Client management: `addClient()`, `removeClient()`, `switchClient()`, `clientExists()`
+  - Repository management: `addRepository()`, `findRepositoryOwners()`
+  - Status: `isInitialized()`, `getConfigStatus()`
+  - Setters: `saveConfig()`, `saveClientConfig()`, specific setters for Git/Jira/Linear/Notion
+- **`constants.ts`** — Configuration constants and defaults
 
 ### `src/core/`
 

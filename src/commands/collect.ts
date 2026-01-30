@@ -14,6 +14,11 @@ import {
   getDataDir,
   saveConfig,
   isInitialized,
+  getActiveClient,
+  getClientConfig,
+  switchClient,
+  addRepository,
+  findRepositoryOwners,
 } from '../config/integrations';
 import { GitMetrics } from '../core/git-metrics';
 import { JiraClient } from '../integrations/jira/client';
@@ -260,8 +265,8 @@ async function collectRepoMetrics(
 // Save Data
 // ==========================================
 
-function saveCollectedData(repoName: string, data: CollectedData, authorSlug?: string): string {
-  const dataDir = getDataDir();
+function saveCollectedData(repoName: string, data: CollectedData, authorSlug?: string, clientName?: string): string {
+  const dataDir = getDataDir(clientName);
   const dateStr = format(new Date(), 'yyyy-MM-dd');
   const filename = authorSlug
     ? `${repoName}_${authorSlug}_${dateStr}.json`
@@ -277,8 +282,8 @@ function saveCollectedData(repoName: string, data: CollectedData, authorSlug?: s
 // Load Historical Data
 // ==========================================
 
-export function loadHistoricalData(repoName: string, limit: number = 10): CollectedData[] {
-  const dataDir = getDataDir();
+export function loadHistoricalData(repoName: string, limit: number = 10, clientName?: string): CollectedData[] {
+  const dataDir = getDataDir(clientName);
   const files: CollectedData[] = [];
   
   try {
@@ -318,6 +323,7 @@ function parseUsernamesOption(usernames?: string): { type: 'none' } | { type: 'a
 
 export async function collectCommand(options: {
   repo?: string;
+  client?: string;
   pull?: boolean;
   total?: boolean;
   since?: string;
@@ -335,11 +341,37 @@ export async function collectCommand(options: {
     return;
   }
 
+  // Determine which client to use
+  let clientName = options.client || getActiveClient();
+  
+  if (!clientName) {
+    printError('No active client. Run `gdm init` to create a client or use --client <name>.');
+    return;
+  }
+
+  // If client specified explicitly, switch to it temporarily
+  const originalClient = getActiveClient();
+  if (options.client && options.client !== originalClient) {
+    try {
+      switchClient(options.client);
+      clientName = options.client;
+    } catch (error) {
+      printError(`Client '${options.client}' not found. Run 'gdm client' to see available clients.`);
+      return;
+    }
+  }
+
   const config = getConfig();
+  
+  if (!config) {
+    printError(`Configuration for client '${clientName}' not found.`);
+    return;
+  }
+  
   const gitConfig = config.git;
 
   if (!gitConfig) {
-    printError('Git configuration missing. Run `gdm init` to configure.');
+    printError(`Git configuration missing for client '${clientName}'. Run 'gdm init' to configure.`);
     return;
   }
 
@@ -362,9 +394,46 @@ export async function collectCommand(options: {
     const cwd = process.cwd();
     try {
       execSync('git rev-parse --git-dir', { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+      
+      // Check if this repo is configured for any client
+      const owners = findRepositoryOwners(cwd);
+      
+      if (owners.length === 0) {
+        // Repository not configured - ask to add it
+        if (!options.quiet) {
+          console.log(chalk.yellow(`\n  Repository not configured: ${cwd}\n`));
+          
+          const readline = await import('readline');
+          const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout,
+          });
+          
+          const answer = await new Promise<string>((resolve) => {
+            rl.question(chalk.cyan('  ? ') + `Add to client '${clientName}'? ` + chalk.gray('[Y/n]') + ': ', (ans) => {
+              rl.close();
+              resolve(ans.trim());
+            });
+          });
+          
+          if (!answer || answer.toLowerCase().startsWith('y')) {
+            addRepository(cwd);
+            console.log(chalk.green(`  ✓ Repository added to '${clientName}'\n`));
+          } else {
+            printError('Repository not configured. Use --repo to specify a different path.');
+            return;
+          }
+        }
+      } else if (!owners.includes(clientName)) {
+        // Repository belongs to different client(s)
+        printWarning(`Repository belongs to: ${owners.join(', ')}`);
+        printError(`Use --client ${owners[0]} or add it to '${clientName}' first.`);
+        return;
+      }
+      
       repos = [cwd];
     } catch {
-      printError('No repositories configured. Run `gdm init` or specify with --repo');
+      printError('Not a git repository. Run `gdm init` or specify with --repo');
       return;
     }
   }
@@ -441,7 +510,7 @@ export async function collectCommand(options: {
         });
 
         const authorSlug = singleUser ? undefined : authorToSlug(username);
-        const filepath = saveCollectedData(repoName, data, authorSlug);
+        const filepath = saveCollectedData(repoName, data, authorSlug, clientName);
         filesSaved.push(filepath);
       }
 
@@ -486,7 +555,16 @@ export async function collectCommand(options: {
       failed.forEach(f => console.log(chalk.gray(`    - ${f.repo}: ${f.error}`)));
     }
 
-    console.log(chalk.gray(`\n  Data directory: ${getDataDir()}\n`));
+    console.log(chalk.gray(`\n  Data directory: ${getDataDir(clientName)}\n`));
+  }
+
+  // Restore original client if we switched
+  if (options.client && originalClient && options.client !== originalClient) {
+    try {
+      switchClient(originalClient);
+    } catch {
+      // Ignore errors when restoring
+    }
   }
 
   // ==========================================
@@ -591,6 +669,7 @@ export async function collectCommand(options: {
 
 export async function showCommand(options: {
   repo?: string;
+  client?: string;
   last?: number;
   format?: 'table' | 'json';
 }): Promise<void> {
@@ -601,7 +680,18 @@ export async function showCommand(options: {
   
   printCompactHeader();
   
-  const config = getConfig();
+  const clientName = options.client || getActiveClient();
+  if (!clientName) {
+    printError('No active client. Use --client <name> or run `gdm init`.');
+    return;
+  }
+  
+  const config = options.client ? getClientConfig(options.client) : getConfig();
+  if (!config) {
+    printError(`Client '${clientName}' not found.`);
+    return;
+  }
+  
   let repoName: string;
   
   if (options.repo) {
@@ -613,7 +703,7 @@ export async function showCommand(options: {
   }
   
   const limit = options.last || 5;
-  const history = loadHistoricalData(repoName, limit);
+  const history = loadHistoricalData(repoName, limit, clientName);
   
   if (!history.length) {
     printWarning(`No data found for ${repoName}. Run \`gdm collect\` first.`);

@@ -8,14 +8,20 @@ import { execSync } from 'child_process';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
 import {
-  saveConfig,
+  addClient,
+  clientExists,
+  findRepositoryOwners,
   isInitialized,
   getConfigStatus,
   ensureConfigDirs,
   getConfigFilePath,
+  getActiveClient,
+  switchClient,
+  getClientConfig,
   GitConfig,
   JiraConfig,
   LinearConfig,
+  ClientConfig,
 } from '../config/integrations';
 import { printWelcome, printSuccess, printError, printWarning, printSection } from '../branding';
 import { JiraClient } from '../integrations/jira/client';
@@ -185,14 +191,19 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     const status = getConfigStatus();
     
     console.log(chalk.yellow('\n  Already configured!\n'));
-    console.log(chalk.gray('  Current settings:'));
-    console.log(`    Client: ${status.clientName}`);
-    console.log(`    Git User: ${status.git.username || 'Not set'} <${status.git.email || 'Not set'}>`);
-    console.log(`    Main Branch: ${status.git.mainBranch || 'Not set'}`);
-    console.log(`    Jira: ${status.jira.configured ? chalk.green('✓ Connected') : chalk.gray('Not configured')}`);
-    console.log(`    Linear: ${status.linear.configured ? chalk.green('✓ Connected') : chalk.gray('Not configured')}`);
-    console.log(`    Repositories: ${status.repositories}`);
-    console.log(`\n  Run ${chalk.cyan('gdm init --force')} to reconfigure.\n`);
+    console.log(chalk.gray('  Configured clients:'));
+    
+    for (const client of status.clients) {
+      const activeMarker = client.active ? chalk.green(' (active)') : '';
+      console.log(`\n    ${chalk.bold(client.name)}${activeMarker}`);
+      console.log(`      Repositories: ${client.repositories}`);
+      console.log(`      Git: ${client.git.configured ? chalk.green('✓') : chalk.gray('✗')} ${client.git.username || 'Not set'}`);
+      console.log(`      Jira: ${client.jira.configured ? chalk.green('✓ Connected') : chalk.gray('Not configured')}`);
+      console.log(`      Linear: ${client.linear.configured ? chalk.green('✓ Connected') : chalk.gray('Not configured')}`);
+    }
+    
+    console.log(`\n  Run ${chalk.cyan('gdm init --force')} to add/update a client.`);
+    console.log(`  Run ${chalk.cyan('gdm client')} to manage clients.\n`);
     return;
   }
   
@@ -206,13 +217,38 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     // Step 1: Client Name (required)
     // ==========================================
     let clientName = '';
+    let isExistingClient = false;
+    let shouldReconfigure = false;
+    
     while (!clientName) {
       printSection('Step 1: Client Name');
       console.log(chalk.gray('  Name of the client or organization (e.g. Pr1or Art, Remax, Givefinity).\n'));
       const clientNameRaw = await ask(rl, 'Client name');
       clientName = clientNameRaw ? clientNameRaw.trim().toUpperCase() : '';
+      
       if (!clientName) {
         printWarning('Client name is required.');
+        continue;
+      }
+      
+      // Check if client already exists
+      if (clientExists(clientName)) {
+        isExistingClient = true;
+        const reconfigure = await askYesNo(rl, `Client '${clientName}' already exists. Reconfigure?`, false);
+        
+        if (!reconfigure) {
+          const createNew = await askYesNo(rl, 'Create a different client?', true);
+          if (createNew) {
+            clientName = '';
+            continue;
+          } else {
+            console.log(chalk.gray('\n  Setup cancelled.\n'));
+            rl.close();
+            return;
+          }
+        }
+        
+        shouldReconfigure = true;
       }
     }
     
@@ -250,6 +286,18 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     } else if (!isGitRepo(repoPath)) {
       printWarning(`Not a Git repository: ${repoPath}`);
       repoPath = '';
+    } else {
+      // Check if repository belongs to another client
+      const owners = findRepositoryOwners(repoPath);
+      const otherOwners = owners.filter(owner => owner !== clientName);
+      
+      if (otherOwners.length > 0) {
+        printWarning(`This repository is already tracked by: ${otherOwners.join(', ')}`);
+        const addAnyway = await askYesNo(rl, 'Add to this client anyway?', false);
+        if (!addAnyway) {
+          repoPath = '';
+        }
+      }
     }
     
     // ==========================================
@@ -385,24 +433,33 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     // ==========================================
     printSection('Saving Configuration');
     
-    saveConfig({
-      initialized: true,
-      version: '1.0.0',
-      clientName,
+    // Get existing repositories if reconfiguring
+    const existingRepos = isExistingClient && shouldReconfigure 
+      ? (getClientConfig(clientName)?.repositories || [])
+      : [];
+    
+    // Merge with new repository if provided
+    const repositories = repoPath 
+      ? [...new Set([...existingRepos, repoPath])]
+      : existingRepos;
+    
+    const clientConfig: ClientConfig = {
       git: gitConfig,
       jira: jiraConfig,
       linear: linearConfig,
       notion: notionConfig,
-      repositories: repoPath ? [repoPath] : [],
+      repositories,
       scheduler: {
         enabled: enableScheduler,
         interval: 'weekly',
         dayOfWeek: 1, // Monday
         time: '09:00',
       },
-    });
+    };
     
-    printSuccess('Configuration saved!');
+    addClient(clientName, clientConfig, true);
+    
+    printSuccess(`Client '${clientName}' configured and activated!`);
     console.log(chalk.gray(`\n  Config file: ${getConfigFilePath()}\n`));
     
     // ==========================================
@@ -458,7 +515,7 @@ export async function quickInitCommand(options: {
   jiraToken?: string;
   linearKey?: string;
 }): Promise<void> {
-  const clientName = options.clientName?.trim();
+  const clientName = options.clientName?.trim().toUpperCase();
   if (!clientName) {
     printError('Client name is required. Use --client-name <name>.');
     return;
@@ -468,26 +525,24 @@ export async function quickInitCommand(options: {
   
   const detected = detectGitUser();
   
-  const config: Record<string, unknown> = {
-    initialized: true,
-    version: '1.0.0',
-    clientName: clientName.toUpperCase(),
+  const clientConfig: ClientConfig = {
     git: {
       username: options.username || detected.username || '',
       email: options.email || detected.email || '',
       mainBranch: options.branch || 'main',
     },
+    repositories: [],
   };
   
   if (options.repo) {
     const fullPath = resolve(options.repo);
     if (existsSync(fullPath) && isGitRepo(fullPath)) {
-      config.repositories = [fullPath];
+      clientConfig.repositories = [fullPath];
     }
   }
   
   if (options.jiraUrl && options.jiraEmail && options.jiraToken) {
-    config.jira = {
+    clientConfig.jira = {
       url: options.jiraUrl,
       email: options.jiraEmail,
       token: options.jiraToken,
@@ -495,9 +550,9 @@ export async function quickInitCommand(options: {
   }
   
   if (options.linearKey) {
-    config.linear = { apiKey: options.linearKey };
+    clientConfig.linear = { apiKey: options.linearKey };
   }
   
-  saveConfig(config);
-  printSuccess('Configuration saved!');
+  addClient(clientName, clientConfig, true);
+  printSuccess(`Client '${clientName}' configured and activated!`);
 }

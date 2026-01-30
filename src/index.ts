@@ -23,6 +23,7 @@ import { initCommand, quickInitCommand } from './commands/init';
 import { collectCommand, showCommand } from './commands/collect';
 import { daemonCommand } from './commands/daemon';
 import { cleanCommand } from './commands/clean';
+import { listClientsCommand, switchClientCommand, removeClientCommand } from './commands/client';
 import { XSEED_LOGO, printBanner, printCompactHeader } from './branding';
 import { isInitialized, getConfigStatus } from './config/integrations';
 
@@ -83,6 +84,7 @@ program
   .command('collect')
   .description('Collect metrics from configured repositories')
   .option('-r, --repo <path>', 'Specific repository to collect from')
+  .option('-c, --client <name>', 'Collect for specific client')
   .option('-a, --all', 'Collect from all configured repositories')
   .option('--no-pull', 'Skip git pull before collecting')
   .option('-t, --total', 'Collect all-time metrics (no date range)')
@@ -103,6 +105,7 @@ program
   .command('show')
   .description('Show collected historical metrics')
   .option('-r, --repo <path>', 'Repository to show data for')
+  .option('-c, --client <name>', 'Show data for specific client')
   .option('-n, --last <number>', 'Number of entries to show', '5')
   .option('-f, --format <type>', 'Output format: table, json', 'table')
   .action((options) => showCommand({ ...options, last: parseInt(options.last) }));
@@ -112,8 +115,33 @@ program
 // ==========================================
 program
   .command('clean')
-  .description('Delete all configuration and data')
-  .action(() => cleanCommand());
+  .description('Delete configuration and/or data')
+  .option('--data', 'Only delete collected metrics data')
+  .option('--config', 'Only delete configuration')
+  .option('--logs', 'Only delete logs')
+  .option('--client <name>', 'Clean specific client')
+  .option('--all', 'Clean everything (requires confirmation)')
+  .option('--yes', 'Skip confirmation prompts')
+  .action(cleanCommand);
+
+// ==========================================
+// Client Management Commands
+// ==========================================
+program
+  .command('client')
+  .description('List all configured clients')
+  .action(listClientsCommand);
+
+program
+  .command('client:switch <name>')
+  .description('Switch active client')
+  .action(switchClientCommand);
+
+program
+  .command('client:remove <name>')
+  .description('Remove a client')
+  .option('--force', 'Skip confirmation')
+  .action(removeClientCommand);
 
 // ==========================================
 // Daemon Command
@@ -135,28 +163,38 @@ program
     console.log(chalk.bold('\n  📋 Configuration Status\n'));
     console.log(chalk.gray('  ' + '─'.repeat(40)));
     
-    console.log(chalk.cyan('\n  Git:'));
-    console.log(`    User: ${status.git.configured ? chalk.green(status.git.username) : chalk.gray('Not configured')}`);
-    console.log(`    Email: ${status.git.email || chalk.gray('Not set')}`);
-    console.log(`    Branch: ${status.git.mainBranch || chalk.gray('Not set')}`);
-    
-    console.log(chalk.cyan('\n  Integrations:'));
-    console.log(`    Jira: ${status.jira.configured ? chalk.green('✓ Connected') : chalk.gray('✗ Not configured')}`);
-    console.log(`    Linear: ${status.linear.configured ? chalk.green('✓ Connected') : chalk.gray('✗ Not configured')}`);
-    console.log(`    Notion: ${status.notion.configured ? chalk.green('✓ Connected') : chalk.gray('✗ Not configured')}`);
-    
-    console.log(chalk.cyan('\n  Scheduler:'));
-    console.log(`    Status: ${status.scheduler.enabled ? chalk.green('✓ Enabled') : chalk.gray('✗ Disabled')}`);
-    if (status.scheduler.interval) {
-      console.log(`    Interval: ${status.scheduler.interval}`);
+    if (!status.initialized || status.totalClients === 0) {
+      console.log(chalk.yellow('\n  → No clients configured. Run `gdm init` to get started.\n'));
+      return;
     }
     
-    console.log(`\n    Repositories: ${status.repositories}`);
-    console.log('');
+    console.log(chalk.cyan('\n  Clients:'));
+    console.log(chalk.gray(`    Total: ${status.totalClients}\n`));
     
-    if (!status.initialized) {
-      console.log(chalk.yellow('  → Run `gdm init` to configure\n'));
+    for (const client of status.clients) {
+      const activeMarker = client.active ? chalk.green(' ★') : '  ';
+      console.log(`${activeMarker} ${chalk.bold(client.name)}`);
+      console.log(chalk.gray(`      Repositories: ${client.repositories}`));
+      console.log(chalk.gray(`      Git: ${client.git.configured ? chalk.green('✓') : chalk.red('✗')} ${client.git.username || 'Not set'}`));
+      
+      const integrations: string[] = [];
+      if (client.jira.configured) integrations.push('Jira');
+      if (client.linear.configured) integrations.push('Linear');
+      if (client.notion.configured) integrations.push('Notion');
+      
+      console.log(chalk.gray(`      Integrations: ${integrations.join(', ') || 'None'}`));
+      
+      if (client.scheduler.enabled) {
+        console.log(chalk.gray(`      Scheduler: ${chalk.green('Enabled')} (${client.scheduler.interval})`));
+      }
+      
+      console.log('');
     }
+    
+    console.log(chalk.gray('  Commands:'));
+    console.log(chalk.gray(`    ${chalk.cyan('gdm client')}                List all clients`));
+    console.log(chalk.gray(`    ${chalk.cyan('gdm client:switch <name>')}  Switch active client`));
+    console.log(chalk.gray(`    ${chalk.cyan('gdm collect')}               Collect for active client\n`));
   });
 
 // Common options helper
@@ -277,12 +315,24 @@ if (args.length === 0) {
   
   if (isInitialized()) {
     const status = getConfigStatus();
-    console.log(chalk.gray('  Quick Status:\n'));
-    console.log(`    Git: ${status.git.configured ? chalk.green(status.git.username) : chalk.yellow('Not configured')}`);
-    console.log(`    Jira: ${status.jira.configured ? chalk.green('Connected') : chalk.gray('Not connected')}`);
-    console.log(`    Linear: ${status.linear.configured ? chalk.green('Connected') : chalk.gray('Not connected')}`);
-    console.log(`    Repos: ${status.repositories}`);
-    console.log('\n  ' + chalk.gray('Run `gdm --help` for available commands\n'));
+    
+    if (status.totalClients === 0) {
+      console.log(chalk.yellow('  → No clients configured. Run `gdm init` to get started\n'));
+    } else {
+      console.log(chalk.gray('  Quick Status:\n'));
+      console.log(`    Clients: ${status.totalClients}`);
+      
+      const activeClient = status.clients.find(c => c.active);
+      if (activeClient) {
+        console.log(`    Active: ${chalk.green(activeClient.name)}`);
+        console.log(`    Git: ${activeClient.git.configured ? chalk.green(activeClient.git.username) : chalk.yellow('Not configured')}`);
+        console.log(`    Jira: ${activeClient.jira.configured ? chalk.green('Connected') : chalk.gray('Not connected')}`);
+        console.log(`    Linear: ${activeClient.linear.configured ? chalk.green('Connected') : chalk.gray('Not connected')}`);
+        console.log(`    Repos: ${activeClient.repositories}`);
+      }
+      
+      console.log('\n  ' + chalk.gray('Run `gdm --help` for available commands\n'));
+    }
   } else {
     console.log(chalk.yellow('  → First time? Run `gdm init` to get started\n'));
   }

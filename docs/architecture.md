@@ -55,9 +55,9 @@ flowchart TB
 
 ### 3. Config
 
-- **Responsibility**: Read/merge config from file and env; expose paths and status; persist updates.
+- **Responsibility**: Read/merge multi-client config from file and env; expose paths and status; persist updates; manage client switching.
 - **Location**: `src/config/integrations.ts`.
-- **Pattern**: File config at `~/.xseed-metrics/config.json`; env overrides for Git/Jira/Linear; getters (`getJiraConfig`, etc.) and setters (`saveConfig`, `markInitialized`, etc.). No CLI or formatting here.
+- **Pattern**: File config at `~/.xseed-metrics/config.json` with multi-client structure; env overrides for Git/Jira/Linear; getters (`getConfig`, `getActiveClient`, `getClientConfig`, `getJiraConfig`, etc.) and setters (`addClient`, `removeClient`, `switchClient`, `saveConfig`, etc.). Supports per-client data and logs directories. No CLI or formatting here.
 
 ### 4. Core (Domain)
 
@@ -126,10 +126,10 @@ flowchart LR
   H --> I[update lastRun]
 ```
 
-1. User runs `gdm collect` (or daemon runs it).
-2. Command reads repos and Git config from `getConfig()`; optionally pulls (git), then uses `GitMetrics` per repo; optionally fetches Jira/Linear via integration clients.
-3. Aggregated payload (e.g. summary, userStats, activity, trends, optional Jira) is written to `getDataDir()` as JSON (e.g. `repo-name_YYYY-MM-DD.json`).
-4. Config can be updated (e.g. `lastRun`).
+1. User runs `gdm collect` (or daemon runs it), optionally specifying `--client <name>` or using the active client.
+2. Command reads repos and Git config from `getConfig()` for the active/specified client; optionally pulls (git), then uses `GitMetrics` per repo; optionally fetches Jira/Linear via integration clients.
+3. Aggregated payload (e.g. summary, userStats, activity, trends, optional Jira) is written to client-specific `getDataDir(clientName)` as JSON (e.g. `CLIENT_A/repo-name_YYYY-MM-DD.json`).
+4. Config can be updated (e.g. `lastRun` for that client). Unconfigured repositories prompt the user to add them to the active client.
 
 ### Daemon (scheduler)
 
@@ -214,6 +214,53 @@ Keep **network and I/O in the client**, **pure metric computation in metrics**, 
 
 - No shared in-memory state between commands; each run is independent.
 - Daemon does not keep a long-running process; it relies on cron to spawn `gdm collect` periodically. So no concurrency between daemon and collect beyond the OS scheduler.
+
+## Multi-Client Architecture
+
+The CLI supports managing multiple clients (organizations/projects) with separate configurations:
+
+### Key Features
+
+- **Multiple clients**: Track metrics for different clients/organizations independently
+- **Active client**: One client is active at a time; commands operate on the active client by default
+- **Client switching**: `gdm client:switch <name>` changes the active client
+- **Per-client isolation**:
+  - Data: `~/.xseed-metrics/data/CLIENT_NAME/`
+  - Logs: `~/.xseed-metrics/logs/CLIENT_NAME/`
+  - Configuration: Each client has separate Git config, repositories, and integrations
+- **Repository ownership**: Repositories can belong to one or more clients; system prompts when adding unconfigured repos
+- **Selective cleaning**: Clean data, logs, or config per client with `--client`, `--data`, `--logs`, `--config` flags
+
+### Config Structure (v2.0)
+
+```json
+{
+  "version": "2.0.0",
+  "initialized": true,
+  "activeClient": "CLIENT_A",
+  "clients": {
+    "CLIENT_A": {
+      "git": { "username": "...", "email": "...", "mainBranch": "main" },
+      "repositories": ["/path/to/repo1"],
+      "jira": { "url": "...", "email": "...", "token": "..." },
+      "scheduler": { "enabled": true, "interval": "weekly", "dayOfWeek": 1, "time": "09:00" }
+    },
+    "CLIENT_B": {
+      "git": { ... },
+      "repositories": ["/path/to/repo2"],
+      "linear": { "apiKey": "..." }
+    }
+  }
+}
+```
+
+### Client Management Commands
+
+- `gdm client` - List all configured clients
+- `gdm client:switch <name>` - Switch active client
+- `gdm client:remove <name>` - Remove a client
+- `gdm collect --client <name>` - Collect for specific client (temporarily switches)
+- `gdm clean --client <name> --data` - Clean specific client's data
 
 ## Security and Secrets
 

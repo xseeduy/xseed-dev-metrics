@@ -88,16 +88,10 @@ export interface SchedulerConfig {
 }
 
 /**
- * Complete integration configuration.
- * Combines all configuration options for the CLI.
+ * Configuration for a single client.
+ * Each client has its own repositories and integration settings.
  */
-export interface IntegrationConfig {
-  /** Configuration version */
-  version?: string;
-  /** Whether initial setup has been completed */
-  initialized?: boolean;
-  /** Client/organization name (stored in uppercase) */
-  clientName?: string;
+export interface ClientConfig {
   /** Git configuration */
   git?: GitConfig;
   /** Jira configuration */
@@ -109,32 +103,77 @@ export interface IntegrationConfig {
   /** Scheduler configuration */
   scheduler?: SchedulerConfig;
   /** List of repository paths to track */
-  repositories?: string[];
+  repositories: string[];
   /** ISO date of last scheduled run */
   lastRun?: string;
 }
 
 /**
- * Configuration status information.
- * Provides a summary of what's configured and from where.
+ * Multi-client configuration structure.
+ * Supports multiple clients with separate configurations.
+ */
+export interface MultiClientConfig {
+  /** Configuration version */
+  version: string;
+  /** Whether initial setup has been completed */
+  initialized: boolean;
+  /** Currently active client name */
+  activeClient?: string;
+  /** Map of client names to their configurations */
+  clients: Record<string, ClientConfig>;
+}
+
+/**
+ * @deprecated Legacy single-client configuration (for reference only)
+ */
+export interface IntegrationConfig {
+  version?: string;
+  initialized?: boolean;
+  clientName?: string;
+  git?: GitConfig;
+  jira?: JiraConfig;
+  linear?: LinearConfig;
+  notion?: NotionConfig;
+  scheduler?: SchedulerConfig;
+  repositories?: string[];
+  lastRun?: string;
+}
+
+/**
+ * Status information for a single client.
+ */
+export interface ClientStatus {
+  /** Client name */
+  name: string;
+  /** Whether this is the active client */
+  active: boolean;
+  /** Number of repositories */
+  repositories: number;
+  /** Git configuration status */
+  git: { configured: boolean; username?: string; email?: string; mainBranch?: string };
+  /** Jira configuration status */
+  jira: { configured: boolean; url?: string; email?: string };
+  /** Linear configuration status */
+  linear: { configured: boolean };
+  /** Notion configuration status */
+  notion: { configured: boolean; enabled?: boolean };
+  /** Scheduler status */
+  scheduler: { enabled: boolean; interval?: string };
+}
+
+/**
+ * Configuration status information for all clients.
+ * Provides a summary of what's configured across all clients.
  */
 export interface ConfigStatus {
   /** Whether initial setup has been completed */
   initialized: boolean;
-  /** Client/organization name */
-  clientName?: string;
-  /** Git configuration status */
-  git: { configured: boolean; username?: string; email?: string; mainBranch?: string };
-  /** Jira configuration status */
-  jira: { configured: boolean; url?: string; email?: string; source?: 'env' | 'file' };
-  /** Linear configuration status */
-  linear: { configured: boolean; source?: 'env' | 'file' };
-  /** Notion configuration status */
-  notion: { configured: boolean; enabled?: boolean; source?: 'env' | 'file' };
-  /** Scheduler status */
-  scheduler: { enabled: boolean; interval?: string };
-  /** Number of configured repositories */
-  repositories: number;
+  /** Active client name */
+  activeClient?: string;
+  /** List of all clients */
+  clients: ClientStatus[];
+  /** Total number of clients */
+  totalClients: number;
 }
 
 // ==========================================
@@ -173,13 +212,13 @@ export function ensureConfigDirs(): void {
 // ==========================================
 
 /**
- * Reads the configuration file from disk.
- * Returns an empty object if the file doesn't exist or can't be read.
+ * Reads the multi-client configuration file from disk.
+ * Returns an initialized empty config if the file doesn't exist or can't be read.
  * 
- * @returns Configuration object from file
+ * @returns Multi-client configuration object from file
  * @private
  */
-function readConfigFile(): IntegrationConfig {
+function readConfigFile(): MultiClientConfig {
   try {
     if (existsSync(CONFIG_FILE)) {
       const content = readFileSync(CONFIG_FILE, 'utf-8');
@@ -190,18 +229,22 @@ function readConfigFile(): IntegrationConfig {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error(`Failed to read config file: ${errorMessage}`);
   }
-  return {};
+  return {
+    version: CONFIG.VERSION,
+    initialized: false,
+    clients: {},
+  };
 }
 
 /**
- * Reads configuration from environment variables.
+ * Reads configuration overrides from environment variables for a client.
  * Environment variables take precedence over file configuration.
  * 
- * @returns Partial configuration from environment
+ * @returns Partial client configuration from environment
  * @private
  */
-function getEnvConfig(): Partial<IntegrationConfig> {
-  const config: Partial<IntegrationConfig> = {};
+function getEnvConfigOverrides(): Partial<ClientConfig> {
+  const config: Partial<ClientConfig> = {};
   
   // Git from env
   if (process.env.GDM_GIT_USERNAME || process.env.GDM_GIT_EMAIL) {
@@ -241,113 +284,248 @@ function getEnvConfig(): Partial<IntegrationConfig> {
 }
 
 /**
- * Gets the complete configuration by merging file and environment sources.
- * Environment variables take precedence over file configuration.
+ * Gets the full multi-client configuration.
  * 
- * @returns Complete configuration object
+ * @returns Multi-client configuration object
  */
-export function getConfig(): IntegrationConfig {
-  const fileConfig = readConfigFile();
-  const envConfig = getEnvConfig();
+export function getFullConfig(): MultiClientConfig {
+  return readConfigFile();
+}
+
+/**
+ * Gets the currently active client name.
+ * 
+ * @returns Active client name or null if none set
+ */
+export function getActiveClient(): string | null {
+  const config = readConfigFile();
+  return config.activeClient || null;
+}
+
+/**
+ * Gets all configured client names.
+ * 
+ * @returns Array of client names
+ */
+export function getAllClients(): string[] {
+  const config = readConfigFile();
+  return Object.keys(config.clients);
+}
+
+/**
+ * Gets configuration for the active client.
+ * Environment variables override file configuration.
+ * 
+ * @returns Active client's configuration or null if no active client
+ */
+export function getConfig(): ClientConfig | null {
+  const fullConfig = readConfigFile();
+  const activeClient = fullConfig.activeClient;
+  
+  if (!activeClient || !fullConfig.clients[activeClient]) {
+    return null;
+  }
+  
+  const clientConfig = fullConfig.clients[activeClient];
+  const envOverrides = getEnvConfigOverrides();
+  
   return {
-    ...fileConfig,
-    git: envConfig.git || fileConfig.git,
-    jira: envConfig.jira || fileConfig.jira,
-    linear: envConfig.linear || fileConfig.linear,
-    notion: envConfig.notion || fileConfig.notion,
+    ...clientConfig,
+    git: envOverrides.git || clientConfig.git,
+    jira: envOverrides.jira || clientConfig.jira,
+    linear: envOverrides.linear || clientConfig.linear,
+    notion: envOverrides.notion || clientConfig.notion,
   };
 }
 
 /**
- * Gets Git configuration if properly configured.
+ * Gets configuration for a specific client.
+ * 
+ * @param clientName - Name of the client
+ * @returns Client configuration or null if client doesn't exist
+ */
+export function getClientConfig(clientName: string): ClientConfig | null {
+  const fullConfig = readConfigFile();
+  return fullConfig.clients[clientName] || null;
+}
+
+/**
+ * Gets Git configuration for active client if properly configured.
  * 
  * @returns Git configuration or null if not properly configured
  */
 export function getGitConfig(): GitConfig | null {
   const config = getConfig();
+  if (!config) return null;
   return config.git?.username && config.git?.email ? config.git : null;
 }
 
 /**
- * Gets Jira configuration if properly configured.
+ * Gets Jira configuration for active client if properly configured.
  * 
  * @returns Jira configuration or null if not properly configured
  */
 export function getJiraConfig(): JiraConfig | null {
   const config = getConfig();
+  if (!config) return null;
   return config.jira?.url && config.jira?.email && config.jira?.token ? config.jira : null;
 }
 
 /**
- * Gets Linear configuration if properly configured.
+ * Gets Linear configuration for active client if properly configured.
  * 
  * @returns Linear configuration or null if not properly configured
  */
 export function getLinearConfig(): LinearConfig | null {
   const config = getConfig();
+  if (!config) return null;
   return config.linear?.apiKey ? config.linear : null;
 }
 
 /**
- * Gets Notion configuration if properly configured.
+ * Gets Notion configuration for active client if properly configured.
  * 
  * @returns Notion configuration or null if not properly configured
  */
 export function getNotionConfig(): NotionConfig | null {
   const config = getConfig();
+  if (!config) return null;
   return config.notion?.enabled && config.notion?.apiKey && config.notion?.parentPageId ? config.notion : null;
 }
 
 /**
- * Checks if the CLI has been initialized with basic configuration.
+ * Checks if the CLI has been initialized with at least one client.
  * 
  * @returns True if initialized, false otherwise
  */
 export function isInitialized(): boolean {
-  const config = getConfig();
-  return config.initialized === true;
+  const fullConfig = readConfigFile();
+  return fullConfig.initialized === true && Object.keys(fullConfig.clients).length > 0;
 }
 
 /**
- * Gets a detailed status of all configuration options.
- * Shows which integrations are configured and their sources.
+ * Checks if a specific client exists.
  * 
- * @returns Configuration status object
+ * @param clientName - Name of the client to check
+ * @returns True if client exists, false otherwise
+ */
+export function clientExists(clientName: string): boolean {
+  const fullConfig = readConfigFile();
+  return !!fullConfig.clients[clientName];
+}
+
+/**
+ * Switches the active client.
+ * 
+ * @param clientName - Name of the client to switch to
+ * @throws Error if client doesn't exist
+ */
+export function switchClient(clientName: string): void {
+  const fullConfig = readConfigFile();
+  
+  if (!fullConfig.clients[clientName]) {
+    throw new Error(`Client '${clientName}' does not exist`);
+  }
+  
+  fullConfig.activeClient = clientName;
+  writeConfigFile(fullConfig);
+}
+
+/**
+ * Adds or updates a client configuration.
+ * 
+ * @param clientName - Name of the client
+ * @param config - Client configuration
+ * @param setActive - Whether to set this client as active (default: true)
+ */
+export function addClient(clientName: string, config: ClientConfig, setActive: boolean = true): void {
+  const fullConfig = readConfigFile();
+  
+  fullConfig.clients[clientName] = config;
+  fullConfig.initialized = true;
+  
+  if (setActive || !fullConfig.activeClient) {
+    fullConfig.activeClient = clientName;
+  }
+  
+  writeConfigFile(fullConfig);
+}
+
+/**
+ * Removes a client from configuration.
+ * If removing the active client, switches to another client or clears active client.
+ * 
+ * @param clientName - Name of the client to remove
+ * @returns True if client was removed, false if it didn't exist
+ */
+export function removeClient(clientName: string): boolean {
+  const fullConfig = readConfigFile();
+  
+  if (!fullConfig.clients[clientName]) {
+    return false;
+  }
+  
+  delete fullConfig.clients[clientName];
+  
+  // If removing active client, switch to another or clear
+  if (fullConfig.activeClient === clientName) {
+    const remainingClients = Object.keys(fullConfig.clients);
+    fullConfig.activeClient = remainingClients.length > 0 ? remainingClients[0] : undefined;
+  }
+  
+  // If no clients left, mark as uninitialized
+  if (Object.keys(fullConfig.clients).length === 0) {
+    fullConfig.initialized = false;
+  }
+  
+  writeConfigFile(fullConfig);
+  return true;
+}
+
+/**
+ * Gets a detailed status of all clients and their configurations.
+ * 
+ * @returns Configuration status object with all clients
  */
 export function getConfigStatus(): ConfigStatus {
-  const fileConfig = readConfigFile();
-  const envConfig = getEnvConfig();
-  const config = getConfig();
+  const fullConfig = readConfigFile();
+  const activeClientName = fullConfig.activeClient;
+  
+  const clients: ClientStatus[] = Object.entries(fullConfig.clients).map(([name, config]) => {
+    return {
+      name,
+      active: name === activeClientName,
+      repositories: config.repositories.length,
+      git: {
+        configured: !!(config.git?.username && config.git?.email),
+        username: config.git?.username,
+        email: config.git?.email,
+        mainBranch: config.git?.mainBranch,
+      },
+      jira: {
+        configured: !!(config.jira?.url && config.jira?.token),
+        url: config.jira?.url,
+        email: config.jira?.email,
+      },
+      linear: {
+        configured: !!config.linear?.apiKey,
+      },
+      notion: {
+        configured: !!(config.notion?.enabled && config.notion?.apiKey && config.notion?.parentPageId),
+        enabled: config.notion?.enabled,
+      },
+      scheduler: {
+        enabled: config.scheduler?.enabled || false,
+        interval: config.scheduler?.interval,
+      },
+    };
+  });
 
   return {
-    initialized: config.initialized === true,
-    clientName: config.clientName,
-    git: {
-      configured: !!(config.git?.username && config.git?.email),
-      username: config.git?.username,
-      email: config.git?.email,
-      mainBranch: config.git?.mainBranch,
-    },
-    jira: {
-      configured: !!(config.jira?.url && config.jira?.token),
-      url: config.jira?.url,
-      email: config.jira?.email,
-      source: envConfig.jira ? 'env' : fileConfig.jira ? 'file' : undefined,
-    },
-    linear: {
-      configured: !!config.linear?.apiKey,
-      source: envConfig.linear ? 'env' : fileConfig.linear ? 'file' : undefined,
-    },
-    notion: {
-      configured: !!(config.notion?.enabled && config.notion?.apiKey && config.notion?.parentPageId),
-      enabled: config.notion?.enabled,
-      source: envConfig.notion ? 'env' : fileConfig.notion ? 'file' : undefined,
-    },
-    scheduler: {
-      enabled: config.scheduler?.enabled || false,
-      interval: config.scheduler?.interval,
-    },
-    repositories: config.repositories?.length || 0,
+    initialized: fullConfig.initialized,
+    activeClient: activeClientName,
+    clients,
+    totalClients: clients.length,
   };
 }
 
@@ -356,12 +534,34 @@ export function getConfigStatus(): ConfigStatus {
 // ==========================================
 
 /**
- * Validates configuration before saving
- * @param config - Configuration to validate
+ * Writes the multi-client configuration file to disk.
+ * 
+ * @param config - Multi-client configuration to write
+ * @private
+ */
+function writeConfigFile(config: MultiClientConfig): void {
+  ensureConfigDirs();
+  
+  // Write config file
+  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  
+  // Set restrictive file permissions (user read/write only)
+  try {
+    chmodSync(CONFIG_FILE, CONFIG.CONFIG_FILE_PERMISSIONS);
+  } catch (error: unknown) {
+    // Log warning but don't fail if permissions can't be set
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.warn(`Warning: Could not set config file permissions: ${errorMessage}`);
+  }
+}
+
+/**
+ * Validates client configuration before saving
+ * @param config - Client configuration to validate
  * @throws Error if validation fails
  * @private
  */
-function validateConfig(config: Partial<IntegrationConfig>): void {
+function validateClientConfig(config: Partial<ClientConfig>): void {
   // Validate Jira config
   if (config.jira) {
     const urlResult = validateUrl(config.jira.url);
@@ -447,35 +647,63 @@ function validateConfig(config: Partial<IntegrationConfig>): void {
 }
 
 /**
- * Saves configuration to disk.
- * Merges with existing configuration, validates, and sets file permissions.
+ * Saves configuration for the active client.
+ * Merges with existing client configuration.
  * 
- * @param config - Partial configuration to save
- * @throws Error if validation fails or file cannot be written
+ * @param config - Partial client configuration to save
+ * @throws Error if validation fails, no active client, or file cannot be written
  */
-export function saveConfig(config: Partial<IntegrationConfig>): void {
-  // Validate configuration before saving
-  validateConfig(config);
-
-  ensureConfigDirs();
-  const existing = readConfigFile();
-  const newConfig = { ...existing, ...config, version: CONFIG.VERSION };
+export function saveConfig(config: Partial<ClientConfig>): void {
+  const fullConfig = readConfigFile();
+  const activeClient = fullConfig.activeClient;
   
-  // Write config file
-  writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2));
-  
-  // Set restrictive file permissions (user read/write only)
-  try {
-    chmodSync(CONFIG_FILE, CONFIG.CONFIG_FILE_PERMISSIONS);
-  } catch (error: unknown) {
-    // Log warning but don't fail if permissions can't be set
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.warn(`Warning: Could not set config file permissions: ${errorMessage}`);
+  if (!activeClient) {
+    throw new Error('No active client. Run `gdm init` to create a client first.');
   }
+  
+  // Validate configuration before saving
+  validateClientConfig(config);
+  
+  // Get existing client config or create new one
+  const existingClientConfig = fullConfig.clients[activeClient] || { repositories: [] };
+  const newClientConfig: ClientConfig = {
+    ...existingClientConfig,
+    ...config,
+    repositories: config.repositories ?? existingClientConfig.repositories,
+  };
+  
+  fullConfig.clients[activeClient] = newClientConfig;
+  writeConfigFile(fullConfig);
 }
 
 /**
- * Sets Git configuration.
+ * Saves configuration for a specific client.
+ * 
+ * @param clientName - Name of the client
+ * @param config - Partial client configuration to save
+ * @throws Error if validation fails or client doesn't exist
+ */
+export function saveClientConfig(clientName: string, config: Partial<ClientConfig>): void {
+  const fullConfig = readConfigFile();
+  
+  if (!fullConfig.clients[clientName]) {
+    throw new Error(`Client '${clientName}' does not exist`);
+  }
+  
+  validateClientConfig(config);
+  
+  const existingClientConfig = fullConfig.clients[clientName];
+  fullConfig.clients[clientName] = {
+    ...existingClientConfig,
+    ...config,
+    repositories: config.repositories ?? existingClientConfig.repositories,
+  };
+  
+  writeConfigFile(fullConfig);
+}
+
+/**
+ * Sets Git configuration for active client.
  * 
  * @param gitConfig - Git configuration to save
  */
@@ -484,7 +712,7 @@ export function setGitConfig(gitConfig: GitConfig): void {
 }
 
 /**
- * Sets Jira configuration.
+ * Sets Jira configuration for active client.
  * 
  * @param jiraConfig - Jira configuration to save
  */
@@ -493,7 +721,7 @@ export function setJiraConfig(jiraConfig: JiraConfig): void {
 }
 
 /**
- * Sets Linear configuration.
+ * Sets Linear configuration for active client.
  * 
  * @param linearConfig - Linear configuration to save
  */
@@ -502,7 +730,7 @@ export function setLinearConfig(linearConfig: LinearConfig): void {
 }
 
 /**
- * Sets Notion configuration.
+ * Sets Notion configuration for active client.
  * 
  * @param notionConfig - Notion configuration to save
  */
@@ -511,7 +739,7 @@ export function setNotionConfig(notionConfig: NotionConfig): void {
 }
 
 /**
- * Sets scheduler configuration.
+ * Sets scheduler configuration for active client.
  * 
  * @param schedulerConfig - Scheduler configuration to save
  */
@@ -520,13 +748,17 @@ export function setSchedulerConfig(schedulerConfig: SchedulerConfig): void {
 }
 
 /**
- * Adds a repository to the tracked repositories list.
+ * Adds a repository to the active client's tracked repositories list.
  * Does nothing if the repository is already in the list.
  * 
  * @param repoPath - Path to the repository to add
  */
 export function addRepository(repoPath: string): void {
   const config = getConfig();
+  if (!config) {
+    throw new Error('No active client. Run `gdm init` first.');
+  }
+  
   const repos = config.repositories || [];
   if (!repos.includes(repoPath)) {
     repos.push(repoPath);
@@ -535,26 +767,60 @@ export function addRepository(repoPath: string): void {
 }
 
 /**
- * Removes a repository from the tracked repositories list.
+ * Adds a repository to a specific client's tracked repositories list.
+ * 
+ * @param clientName - Name of the client
+ * @param repoPath - Path to the repository to add
+ */
+export function addRepositoryToClient(clientName: string, repoPath: string): void {
+  const clientConfig = getClientConfig(clientName);
+  if (!clientConfig) {
+    throw new Error(`Client '${clientName}' does not exist`);
+  }
+  
+  const repos = clientConfig.repositories || [];
+  if (!repos.includes(repoPath)) {
+    repos.push(repoPath);
+    saveClientConfig(clientName, { repositories: repos });
+  }
+}
+
+/**
+ * Removes a repository from the active client's tracked repositories list.
  * 
  * @param repoPath - Path to the repository to remove
  */
 export function removeRepository(repoPath: string): void {
   const config = getConfig();
-  const repos = (config.repositories || []).filter(r => r !== repoPath);
+  if (!config) {
+    throw new Error('No active client');
+  }
+  
+  const repos = config.repositories.filter(r => r !== repoPath);
   saveConfig({ repositories: repos });
 }
 
 /**
- * Marks the configuration as initialized.
- * Called after the initial setup wizard completes.
+ * Finds which client(s) a repository belongs to.
+ * 
+ * @param repoPath - Path to the repository
+ * @returns Array of client names that have this repository
  */
-export function markInitialized(): void {
-  saveConfig({ initialized: true });
+export function findRepositoryOwners(repoPath: string): string[] {
+  const fullConfig = readConfigFile();
+  const owners: string[] = [];
+  
+  for (const [clientName, config] of Object.entries(fullConfig.clients)) {
+    if (config.repositories.includes(repoPath)) {
+      owners.push(clientName);
+    }
+  }
+  
+  return owners;
 }
 
 /**
- * Updates the last run timestamp to the current time.
+ * Updates the last run timestamp for the active client.
  * Called after each scheduled collection.
  */
 export function updateLastRun(): void {
@@ -569,29 +835,73 @@ export function updateLastRun(): void {
  * Gets the path to the configuration file.
  * @returns Absolute path to config.json
  */
-export function getConfigFilePath(): string { return CONFIG_FILE; }
+export function getConfigFilePath(): string { 
+  return CONFIG_FILE; 
+}
 
 /**
  * Gets the configuration directory path.
  * @returns Absolute path to ~/.xseed-metrics/
  */
-export function getConfigDir(): string { return CONFIG_DIR; }
+export function getConfigDir(): string { 
+  return CONFIG_DIR; 
+}
 
 /**
- * Gets the data directory path.
- * @returns Absolute path to ~/.xseed-metrics/data/
+ * Gets the data directory path for a specific client or active client.
+ * Creates the directory if it doesn't exist.
+ * 
+ * @param clientName - Optional client name (defaults to active client)
+ * @returns Absolute path to ~/.xseed-metrics/data/CLIENT_NAME/
  */
-export function getDataDir(): string { return DATA_DIR; }
+export function getDataDir(clientName?: string): string {
+  const client = clientName || getActiveClient();
+  
+  if (!client) {
+    // Fallback to root data dir if no client specified/active
+    return DATA_DIR;
+  }
+  
+  const clientDataDir = join(DATA_DIR, client);
+  
+  // Ensure directory exists
+  if (!existsSync(clientDataDir)) {
+    mkdirSync(clientDataDir, { recursive: true, mode: CONFIG.CONFIG_DIR_PERMISSIONS });
+  }
+  
+  return clientDataDir;
+}
 
 /**
- * Gets the logs directory path.
- * @returns Absolute path to ~/.xseed-metrics/logs/
+ * Gets the logs directory path for a specific client or active client.
+ * Creates the directory if it doesn't exist.
+ * 
+ * @param clientName - Optional client name (defaults to active client)
+ * @returns Absolute path to ~/.xseed-metrics/logs/CLIENT_NAME/
  */
-export function getLogsDir(): string { return LOGS_DIR; }
+export function getLogsDir(clientName?: string): string {
+  const client = clientName || getActiveClient();
+  
+  if (!client) {
+    // Fallback to root logs dir if no client specified/active
+    return LOGS_DIR;
+  }
+  
+  const clientLogsDir = join(LOGS_DIR, client);
+  
+  // Ensure directory exists
+  if (!existsSync(clientLogsDir)) {
+    mkdirSync(clientLogsDir, { recursive: true, mode: CONFIG.CONFIG_DIR_PERMISSIONS });
+  }
+  
+  return clientLogsDir;
+}
 
 /**
  * Checks if the configuration file exists.
  * @returns True if config file exists, false otherwise
  */
-export function configFileExists(): boolean { return existsSync(CONFIG_FILE); }
+export function configFileExists(): boolean { 
+  return existsSync(CONFIG_FILE); 
+}
 

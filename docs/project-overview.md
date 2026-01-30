@@ -11,6 +11,7 @@
 3. **Generate reports** (weekly/monthly) for clients or internal use.
 4. **Correlate Git activity** with Jira and Linear issues (cycle time, lead time, throughput, WIP).
 5. **Automate collection** via a background scheduler (daemon) so metrics are gathered without manual runs.
+6. **Support multiple clients** with separate configurations, repositories, and data isolation.
 
 ## Audience
 
@@ -25,9 +26,12 @@
 
 ## Configuration
 
-- **Config file**: `~/.xseed-metrics/config.json` (created by `gdm init`).
-- **Data directory**: `~/.xseed-metrics/data/` (collected metrics as JSON files).
-- **Logs**: `~/.xseed-metrics/logs/` (e.g. daemon logs).
+- **Config file**: `~/.xseed-metrics/config.json` (multi-client structure, created/updated by `gdm init`).
+- **Multi-client support**: Track multiple clients/organizations with separate configurations
+  - Active client: One client active at a time
+  - Per-client data: `~/.xseed-metrics/data/CLIENT_NAME/`
+  - Per-client logs: `~/.xseed-metrics/logs/CLIENT_NAME/`
+- **Client management**: Commands to list, switch, and remove clients (`gdm client`, `gdm client:switch`, `gdm client:remove`)
 - **Environment variables** override file config: `GDM_GIT_USERNAME`, `GDM_GIT_EMAIL`, `GDM_MAIN_BRANCH`, `JIRA_*`, `LINEAR_API_KEY`.
 
 ## Commands Summary
@@ -35,7 +39,8 @@
 | Category | Commands |
 |----------|----------|
 | Setup | `init`, `status`, `config` |
-| Collection | `collect`, `show`, `daemon` |
+| Client Management | `client`, `client:switch`, `client:remove` |
+| Collection | `collect`, `show`, `daemon`, `clean` |
 | Git analysis | `summary`, `authors`, `commits`, `activity`, `files`, `trends`, `blame`, `types`, `report` |
 | Integrations | `jira`, `linear` |
 
