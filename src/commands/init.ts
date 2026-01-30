@@ -25,6 +25,12 @@ import { LinearClient } from '../integrations/linear/client';
 // Readline Helper
 // ==========================================
 
+/**
+ * Creates a readline interface for interactive user input.
+ * 
+ * @returns Readline interface
+ * @private
+ */
 function createRL(): readline.Interface {
   return readline.createInterface({
     input: process.stdin,
@@ -32,6 +38,15 @@ function createRL(): readline.Interface {
   });
 }
 
+/**
+ * Prompts the user for input with an optional default value.
+ * 
+ * @param rl - Readline interface
+ * @param question - Question to ask the user
+ * @param defaultValue - Optional default value
+ * @returns Promise resolving to user's answer
+ * @private
+ */
 async function ask(rl: readline.Interface, question: string, defaultValue?: string): Promise<string> {
   const defaultHint = defaultValue ? chalk.gray(` [${defaultValue}]`) : '';
   const prompt = chalk.cyan('  ? ') + question + defaultHint + ': ';
@@ -43,6 +58,15 @@ async function ask(rl: readline.Interface, question: string, defaultValue?: stri
   });
 }
 
+/**
+ * Prompts the user for a yes/no question.
+ * 
+ * @param rl - Readline interface
+ * @param question - Question to ask
+ * @param defaultYes - Whether the default is yes (true) or no (false)
+ * @returns Promise resolving to user's boolean answer
+ * @private
+ */
 async function askYesNo(rl: readline.Interface, question: string, defaultYes: boolean = true): Promise<boolean> {
   const hint = defaultYes ? chalk.gray(' [Y/n]') : chalk.gray(' [y/N]');
   const answer = await ask(rl, question + hint);
@@ -51,6 +75,15 @@ async function askYesNo(rl: readline.Interface, question: string, defaultYes: bo
   return answer.toLowerCase().startsWith('y');
 }
 
+/**
+ * Prompts the user for password input.
+ * Note: In current implementation, input is visible (not hidden).
+ * 
+ * @param rl - Readline interface
+ * @param question - Question to ask
+ * @returns Promise resolving to user's password input
+ * @private
+ */
 async function askPassword(rl: readline.Interface, question: string): Promise<string> {
   const prompt = chalk.cyan('  ? ') + question + ': ';
   
@@ -68,6 +101,12 @@ async function askPassword(rl: readline.Interface, question: string): Promise<st
 // Auto-detection helpers
 // ==========================================
 
+/**
+ * Detects Git user information from global git config.
+ * 
+ * @returns Object with username and email
+ * @private
+ */
 function detectGitUser(): { username: string; email: string } {
   let username = '';
   let email = '';
@@ -83,6 +122,14 @@ function detectGitUser(): { username: string; email: string } {
   return { username, email };
 }
 
+/**
+ * Detects the main branch name for a repository.
+ * Checks for 'main' first, then 'master', defaults to 'main'.
+ * 
+ * @param repoPath - Optional repository path (defaults to current directory)
+ * @returns Main branch name ('main' or 'master')
+ * @private
+ */
 function detectMainBranch(repoPath?: string): string {
   try {
     const workDir = repoPath || process.cwd();
@@ -99,6 +146,13 @@ function detectMainBranch(repoPath?: string): string {
   }
 }
 
+/**
+ * Checks if a directory is a valid git repository.
+ * 
+ * @param path - Path to check
+ * @returns True if it's a git repository, false otherwise
+ * @private
+ */
 function isGitRepo(path: string): boolean {
   try {
     execSync('git rev-parse --git-dir', { cwd: path, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
@@ -112,6 +166,13 @@ function isGitRepo(path: string): boolean {
 // Init Command
 // ==========================================
 
+/**
+ * Interactive setup wizard for first-time configuration.
+ * Guides the user through configuring Git, repositories, and integrations.
+ * 
+ * @param options - Command options
+ * @param options.force - Force reconfiguration even if already initialized
+ */
 export async function initCommand(options: { force?: boolean } = {}): Promise<void> {
   ensureConfigDirs();
   
@@ -367,6 +428,21 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
 // Quick Init (non-interactive)
 // ==========================================
 
+/**
+ * Non-interactive setup using command-line options.
+ * Useful for CI/CD environments or scripted setups.
+ * 
+ * @param options - Configuration options
+ * @param options.clientName - Client/organization name (required)
+ * @param options.username - Git username
+ * @param options.email - Git email
+ * @param options.branch - Main branch name
+ * @param options.repo - Repository path
+ * @param options.jiraUrl - Jira instance URL
+ * @param options.jiraEmail - Jira account email
+ * @param options.jiraToken - Jira API token
+ * @param options.linearKey - Linear API key
+ */
 export async function quickInitCommand(options: {
   clientName?: string;
   username?: string;

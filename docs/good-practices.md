@@ -7,6 +7,13 @@ This document describes coding standards, conventions, and patterns that the pro
 - **Language**: TypeScript; target ES2022 (see `tsconfig.json`). Use strict mode and avoid `any` where a proper type is reasonable.
 - **Style**: Use consistent formatting. Consider ESLint/Prettier if not already configured; the project has `npm run lint` (ESLint for `src/**/*.ts`).
 - **Comments**: Use brief section comments (e.g. `// ========== Section ==========`) for major blocks. Document non-obvious logic or business rules inline.
+- **Documentation**: The codebase uses **JSDoc** comments for all public APIs, classes, interfaces, and functions. Follow the existing JSDoc patterns when adding new code:
+  - Document all public functions, classes, and interfaces
+  - Include `@param` tags for all parameters with types and descriptions
+  - Include `@returns` tags for return values
+  - Add `@example` blocks for complex APIs
+  - Use `@throws` to document exceptions
+  - Mark internal/private functions with `@private`
 - **Imports**: Prefer explicit imports; group by: external packages, then internal modules (config, core, integrations, output, utils). Use path aliases only if defined in tsconfig.
 
 ## File and Module Layout

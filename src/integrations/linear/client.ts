@@ -11,17 +11,50 @@ import {
 
 const LINEAR_API_URL = 'https://api.linear.app/graphql';
 
+/**
+ * Sleeps for a specified duration.
+ * 
+ * @param ms - Milliseconds to sleep
+ * @returns Promise that resolves after the delay
+ * @private
+ */
 async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Linear API client for interacting with Linear's GraphQL API.
+ * Provides methods for querying teams, issues, cycles, and metrics.
+ * 
+ * @example
+ * ```typescript
+ * const client = new LinearClient({ apiKey: 'lin_api_...' });
+ * const teams = await client.getTeams();
+ * const issues = await client.getIssues({ teamId: team.id });
+ * ```
+ */
 export class LinearClient {
   private apiKey: string;
 
+  /**
+   * Creates a new Linear API client.
+   * 
+   * @param config - Linear configuration containing API key
+   */
   constructor(config: LinearConfig) {
     this.apiKey = config.apiKey;
   }
 
+  /**
+   * Executes a GraphQL query against the Linear API.
+   * 
+   * @template T
+   * @param query - GraphQL query string
+   * @param variables - Optional query variables
+   * @returns Promise resolving to the query response data
+   * @throws {Error} If the request fails or returns errors
+   * @private
+   */
   private async graphql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
     const response = await fetch(LINEAR_API_URL, {
       method: 'POST',
@@ -51,6 +84,11 @@ export class LinearClient {
   // Teams
   // ==========================================
 
+  /**
+   * Gets all teams from the Linear workspace.
+   * 
+   * @returns Promise resolving to array of teams
+   */
   async getTeams(): Promise<LinearTeam[]> {
     const query = `
       query {
@@ -68,6 +106,12 @@ export class LinearClient {
     return result.teams.nodes;
   }
 
+  /**
+   * Finds a team by name or key (case-insensitive).
+   * 
+   * @param name - Team name or key to search for
+   * @returns Promise resolving to the team or null if not found
+   */
   async getTeamByName(name: string): Promise<LinearTeam | null> {
     const teams = await this.getTeams();
     return teams.find(t => 
@@ -80,6 +124,18 @@ export class LinearClient {
   // Issues
   // ==========================================
 
+  /**
+   * Gets issues from Linear with optional filtering.
+   * Automatically handles pagination to retrieve all matching issues.
+   * 
+   * @param options - Filter options for querying issues
+   * @param options.teamId - Filter by team ID
+   * @param options.teamName - Filter by team name (resolved to team ID)
+   * @param options.assigneeId - Filter by assignee ID
+   * @param options.since - Filter issues updated since this date
+   * @param options.until - Filter issues updated before this date
+   * @returns Promise resolving to array of issues
+   */
   async getIssues(options: LinearFilterOptions): Promise<LinearIssue[]> {
     const query = `
       query GetIssues($teamId: String, $after: String, $first: Int, $filter: IssueFilter) {

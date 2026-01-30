@@ -7,33 +7,62 @@ import { readFileSync } from 'fs';
 import { format } from 'date-fns';
 import { NotionConfig } from '../../config/integrations';
 
+/**
+ * Structure of collected metrics data.
+ * This is the format saved to JSON files by the collect command.
+ */
 interface CollectedData {
+  /** ISO timestamp when data was collected */
   collectedAt: string;
+  /** Name of the JSON file */
   fileName?: string;
+  /** Time period covered by the metrics */
   period?: {
     since: string | null;
     until: string | null;
     label: string;
   };
+  /** Full path to the repository */
   repository: string;
+  /** Repository name (derived from path or remote URL) */
   repoName: string;
+  /** User information */
   user: { username: string; email: string };
+  /** Git metrics data */
   gitMetrics: unknown;
+  /** Optional Jira metrics data */
   jiraMetrics?: unknown;
 }
 
+/**
+ * Notion API client for uploading metrics to a Notion workspace.
+ * Creates a hierarchical page structure: Git Metrics > ClientName > Username > Date.
+ * 
+ * @example
+ * ```typescript
+ * const client = new NotionClient(notionConfig);
+ * const uploaded = await client.uploadCollectedFiles([{ path, data }]);
+ * ```
+ */
 export class NotionClient {
   private client: Client;
   private config: NotionConfig;
   private pageCache: Map<string, string> = new Map();
 
+  /**
+   * Creates a new Notion client.
+   * 
+   * @param config - Notion configuration containing API key and parent page ID
+   */
   constructor(config: NotionConfig) {
     this.config = config;
     this.client = new Client({ auth: config.apiKey });
   }
 
   /**
-   * Test Notion connection
+   * Tests the Notion API connection.
+   * 
+   * @returns Promise resolving to connection status and user info
    */
   async testConnection(): Promise<{ success: boolean; user?: string; error?: string }> {
     try {
@@ -46,7 +75,11 @@ export class NotionClient {
   }
 
   /**
-   * Ensure "Git Metrics" root page exists under parent
+   * Ensures the "Git Metrics" root page exists under the parent page.
+   * Creates the page if it doesn't exist, otherwise returns the existing page ID.
+   * 
+   * @returns Promise resolving to the page ID
+   * @private
    */
   private async ensureGitMetricsPage(): Promise<string> {
     const cacheKey = `git-metrics:${this.config.parentPageId}`;
@@ -89,7 +122,13 @@ export class NotionClient {
   }
 
   /**
-   * Ensure ClientName page exists under Git Metrics
+   * Ensures a client/organization page exists under the Git Metrics page.
+   * Creates the page if it doesn't exist, otherwise returns the existing page ID.
+   * 
+   * @param gitMetricsPageId - Parent "Git Metrics" page ID
+   * @param clientName - Client or organization name
+   * @returns Promise resolving to the page ID
+   * @private
    */
   private async ensureClientPage(gitMetricsPageId: string, clientName: string): Promise<string> {
     const cacheKey = `client:${gitMetricsPageId}:${clientName}`;

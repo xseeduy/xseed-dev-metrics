@@ -10,58 +10,120 @@ import { join } from 'path';
 // Types
 // ==========================================
 
+/**
+ * Jira integration configuration.
+ * Required for connecting to Atlassian Jira for issue tracking metrics.
+ */
 export interface JiraConfig {
+  /** Jira instance URL (e.g., https://company.atlassian.net) */
   url: string;
+  /** Jira account email */
   email: string;
+  /** Jira API token */
   token: string;
 }
 
+/**
+ * Linear integration configuration.
+ * Required for connecting to Linear for issue tracking metrics.
+ */
 export interface LinearConfig {
+  /** Linear API key */
   apiKey: string;
 }
 
+/**
+ * Notion integration configuration.
+ * Required for uploading metrics to Notion workspace.
+ */
 export interface NotionConfig {
+  /** Whether Notion integration is enabled */
   enabled: boolean;
+  /** Notion API key (integration secret) */
   apiKey: string;
+  /** Parent page ID where metrics will be uploaded */
   parentPageId: string;
+  /** Optional client/organization name */
   clientName?: string;
+  /** Whether to automatically upload on scheduled collection runs */
   autoUploadOnSchedule?: boolean;
 }
 
+/**
+ * Git configuration for filtering commits.
+ * Defines which developer's commits to track.
+ */
 export interface GitConfig {
+  /** Git username for filtering commits */
   username: string;
+  /** Git email for filtering commits */
   email: string;
-  mainBranch: string;  // 'main' or 'master'
+  /** Main branch name ('main' or 'master') */
+  mainBranch: string;
 }
 
+/**
+ * Scheduler configuration for automatic collection.
+ * Defines when and how often to run automatic metric collection.
+ */
 export interface SchedulerConfig {
+  /** Whether scheduler is enabled */
   enabled: boolean;
+  /** Collection interval */
   interval: 'daily' | 'weekly' | 'monthly';
-  dayOfWeek?: number;  // 0-6 for weekly
-  time?: string;       // HH:MM format
+  /** Day of week for weekly schedule (0-6, Monday=1) */
+  dayOfWeek?: number;
+  /** Time of day in HH:MM format */
+  time?: string;
 }
 
+/**
+ * Complete integration configuration.
+ * Combines all configuration options for the CLI.
+ */
 export interface IntegrationConfig {
+  /** Configuration version */
   version?: string;
+  /** Whether initial setup has been completed */
   initialized?: boolean;
-  clientName?: string;      // Client/organization name (stored in uppercase)
+  /** Client/organization name (stored in uppercase) */
+  clientName?: string;
+  /** Git configuration */
   git?: GitConfig;
+  /** Jira configuration */
   jira?: JiraConfig;
+  /** Linear configuration */
   linear?: LinearConfig;
+  /** Notion configuration */
   notion?: NotionConfig;
+  /** Scheduler configuration */
   scheduler?: SchedulerConfig;
-  repositories?: string[];  // List of repo paths to track
-  lastRun?: string;         // ISO date of last scheduled run
+  /** List of repository paths to track */
+  repositories?: string[];
+  /** ISO date of last scheduled run */
+  lastRun?: string;
 }
 
+/**
+ * Configuration status information.
+ * Provides a summary of what's configured and from where.
+ */
 export interface ConfigStatus {
+  /** Whether initial setup has been completed */
   initialized: boolean;
+  /** Client/organization name */
   clientName?: string;
+  /** Git configuration status */
   git: { configured: boolean; username?: string; email?: string; mainBranch?: string };
+  /** Jira configuration status */
   jira: { configured: boolean; url?: string; email?: string; source?: 'env' | 'file' };
+  /** Linear configuration status */
   linear: { configured: boolean; source?: 'env' | 'file' };
+  /** Notion configuration status */
   notion: { configured: boolean; enabled?: boolean; source?: 'env' | 'file' };
+  /** Scheduler status */
   scheduler: { enabled: boolean; interval?: string };
+  /** Number of configured repositories */
   repositories: number;
 }
 
@@ -78,6 +140,10 @@ const LOGS_DIR = join(CONFIG_DIR, 'logs');
 // Ensure directories exist
 // ==========================================
 
+/**
+ * Ensures that all required configuration directories exist.
+ * Creates directories if they don't exist.
+ */
 export function ensureConfigDirs(): void {
   [CONFIG_DIR, DATA_DIR, LOGS_DIR].forEach(dir => {
     if (!existsSync(dir)) {
@@ -90,6 +156,13 @@ export function ensureConfigDirs(): void {
 // Read Configuration
 // ==========================================
 
+/**
+ * Reads the configuration file from disk.
+ * Returns an empty object if the file doesn't exist or can't be read.
+ * 
+ * @returns Configuration object from file
+ * @private
+ */
 function readConfigFile(): IntegrationConfig {
   try {
     if (existsSync(CONFIG_FILE)) {
@@ -99,6 +172,13 @@ function readConfigFile(): IntegrationConfig {
   return {};
 }
 
+/**
+ * Reads configuration from environment variables.
+ * Environment variables take precedence over file configuration.
+ * 
+ * @returns Partial configuration from environment
+ * @private
+ */
 function getEnvConfig(): Partial<IntegrationConfig> {
   const config: Partial<IntegrationConfig> = {};
   
@@ -139,6 +219,12 @@ function getEnvConfig(): Partial<IntegrationConfig> {
   return config;
 }
 
+/**
+ * Gets the complete configuration by merging file and environment sources.
+ * Environment variables take precedence over file configuration.
+ * 
+ * @returns Complete configuration object
+ */
 export function getConfig(): IntegrationConfig {
   const fileConfig = readConfigFile();
   const envConfig = getEnvConfig();
@@ -151,31 +237,62 @@ export function getConfig(): IntegrationConfig {
   };
 }
 
+/**
+ * Gets Git configuration if properly configured.
+ * 
+ * @returns Git configuration or null if not properly configured
+ */
 export function getGitConfig(): GitConfig | null {
   const config = getConfig();
   return config.git?.username && config.git?.email ? config.git : null;
 }
 
+/**
+ * Gets Jira configuration if properly configured.
+ * 
+ * @returns Jira configuration or null if not properly configured
+ */
 export function getJiraConfig(): JiraConfig | null {
   const config = getConfig();
   return config.jira?.url && config.jira?.email && config.jira?.token ? config.jira : null;
 }
 
+/**
+ * Gets Linear configuration if properly configured.
+ * 
+ * @returns Linear configuration or null if not properly configured
+ */
 export function getLinearConfig(): LinearConfig | null {
   const config = getConfig();
   return config.linear?.apiKey ? config.linear : null;
 }
 
+/**
+ * Gets Notion configuration if properly configured.
+ * 
+ * @returns Notion configuration or null if not properly configured
+ */
 export function getNotionConfig(): NotionConfig | null {
   const config = getConfig();
   return config.notion?.enabled && config.notion?.apiKey && config.notion?.parentPageId ? config.notion : null;
 }
 
+/**
+ * Checks if the CLI has been initialized with basic configuration.
+ * 
+ * @returns True if initialized, false otherwise
+ */
 export function isInitialized(): boolean {
   const config = getConfig();
   return config.initialized === true;
 }
 
+/**
+ * Gets a detailed status of all configuration options.
+ * Shows which integrations are configured and their sources.
+ * 
+ * @returns Configuration status object
+ */
 export function getConfigStatus(): ConfigStatus {
   const fileConfig = readConfigFile();
   const envConfig = getEnvConfig();
@@ -217,6 +334,12 @@ export function getConfigStatus(): ConfigStatus {
 // Write Configuration
 // ==========================================
 
+/**
+ * Saves configuration to disk.
+ * Merges with existing configuration and sets version.
+ * 
+ * @param config - Partial configuration to save
+ */
 export function saveConfig(config: Partial<IntegrationConfig>): void {
   ensureConfigDirs();
   const existing = readConfigFile();
@@ -224,26 +347,57 @@ export function saveConfig(config: Partial<IntegrationConfig>): void {
   writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2));
 }
 
+/**
+ * Sets Git configuration.
+ * 
+ * @param gitConfig - Git configuration to save
+ */
 export function setGitConfig(gitConfig: GitConfig): void {
   saveConfig({ git: gitConfig });
 }
 
+/**
+ * Sets Jira configuration.
+ * 
+ * @param jiraConfig - Jira configuration to save
+ */
 export function setJiraConfig(jiraConfig: JiraConfig): void {
   saveConfig({ jira: jiraConfig });
 }
 
+/**
+ * Sets Linear configuration.
+ * 
+ * @param linearConfig - Linear configuration to save
+ */
 export function setLinearConfig(linearConfig: LinearConfig): void {
   saveConfig({ linear: linearConfig });
 }
 
+/**
+ * Sets Notion configuration.
+ * 
+ * @param notionConfig - Notion configuration to save
+ */
 export function setNotionConfig(notionConfig: NotionConfig): void {
   saveConfig({ notion: notionConfig });
 }
 
+/**
+ * Sets scheduler configuration.
+ * 
+ * @param schedulerConfig - Scheduler configuration to save
+ */
 export function setSchedulerConfig(schedulerConfig: SchedulerConfig): void {
   saveConfig({ scheduler: schedulerConfig });
 }
 
+/**
+ * Adds a repository to the tracked repositories list.
+ * Does nothing if the repository is already in the list.
+ * 
+ * @param repoPath - Path to the repository to add
+ */
 export function addRepository(repoPath: string): void {
   const config = getConfig();
   const repos = config.repositories || [];
@@ -253,16 +407,29 @@ export function addRepository(repoPath: string): void {
   }
 }
 
+/**
+ * Removes a repository from the tracked repositories list.
+ * 
+ * @param repoPath - Path to the repository to remove
+ */
 export function removeRepository(repoPath: string): void {
   const config = getConfig();
   const repos = (config.repositories || []).filter(r => r !== repoPath);
   saveConfig({ repositories: repos });
 }
 
+/**
+ * Marks the configuration as initialized.
+ * Called after the initial setup wizard completes.
+ */
 export function markInitialized(): void {
   saveConfig({ initialized: true });
 }
 
+/**
+ * Updates the last run timestamp to the current time.
+ * Called after each scheduled collection.
+ */
 export function updateLastRun(): void {
   saveConfig({ lastRun: new Date().toISOString() });
 }
@@ -271,9 +438,33 @@ export function updateLastRun(): void {
 // Paths
 // ==========================================
 
+/**
+ * Gets the path to the configuration file.
+ * @returns Absolute path to config.json
+ */
 export function getConfigFilePath(): string { return CONFIG_FILE; }
+
+/**
+ * Gets the configuration directory path.
+ * @returns Absolute path to ~/.xseed-metrics/
+ */
 export function getConfigDir(): string { return CONFIG_DIR; }
+
+/**
+ * Gets the data directory path.
+ * @returns Absolute path to ~/.xseed-metrics/data/
+ */
 export function getDataDir(): string { return DATA_DIR; }
+
+/**
+ * Gets the logs directory path.
+ * @returns Absolute path to ~/.xseed-metrics/logs/
+ */
 export function getLogsDir(): string { return LOGS_DIR; }
+
+/**
+ * Checks if the configuration file exists.
+ * @returns True if config file exists, false otherwise
+ */
 export function configFileExists(): boolean { return existsSync(CONFIG_FILE); }
 

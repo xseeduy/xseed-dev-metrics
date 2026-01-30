@@ -5,10 +5,29 @@
 import { JiraConfig } from '../../config/integrations';
 import { JiraIssue, JiraSearchResult, JiraSprint, JiraSprintResult, JiraBoardResult, JiraFilterOptions } from './types';
 
+/**
+ * Sleeps for a specified duration.
+ * 
+ * @param ms - Milliseconds to sleep
+ * @returns Promise that resolves after the delay
+ * @private
+ */
 async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Executes a function with retry logic for handling transient failures.
+ * Automatically retries on rate limits (429) and transient errors.
+ * 
+ * @template T
+ * @param fn - Function to execute
+ * @param maxRetries - Maximum number of retry attempts (default: 3)
+ * @param baseDelay - Base delay in milliseconds (default: 1000)
+ * @returns Promise resolving to the function's return value
+ * @throws {Error} If max retries exceeded or authentication fails
+ * @private
+ */
 async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 1000): Promise<T> {
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -28,15 +47,44 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3, baseDelay = 10
   throw lastError || new Error('Max retries exceeded');
 }
 
+/**
+ * Jira API client for interacting with Atlassian Jira.
+ * Supports issue search, project queries, sprint data, and board information.
+ * Includes automatic retry logic and rate limit handling.
+ * 
+ * @example
+ * ```typescript
+ * const client = new JiraClient({ url, email, token });
+ * const issues = await client.getProjectIssues({ project: 'MYPROJ' });
+ * ```
+ */
 export class JiraClient {
   private baseUrl: string;
   private auth: string;
 
+  /**
+   * Creates a new Jira API client.
+   * 
+   * @param config - Jira configuration containing URL, email, and API token
+   */
   constructor(config: JiraConfig) {
     this.baseUrl = config.url.replace(/\/$/, '');
     this.auth = Buffer.from(`${config.email}:${config.token}`).toString('base64');
   }
 
+  /**
+   * Makes an HTTP request to the Jira API.
+   * 
+   * @template T
+   * @param endpoint - API endpoint path
+   * @param options - Request options
+   * @param options.method - HTTP method (default: GET)
+   * @param options.body - Request body for POST/PUT requests
+   * @param options.params - Query parameters
+   * @returns Promise resolving to the API response
+   * @throws {Error} If the request fails or returns a non-2xx status
+   * @private
+   */
   private async request<T>(
     endpoint: string,
     options: { method?: string; body?: unknown; params?: Record<string, string | number> } = {}
@@ -78,6 +126,21 @@ export class JiraClient {
     return text ? JSON.parse(text) as T : ({} as T);
   }
 
+  /**
+   * Searches for issues using JQL (Jira Query Language).
+   * 
+   * @param jql - JQL query string
+   * @param options - Search options
+   * @param options.startAt - Pagination offset (default: 0)
+   * @param options.maxResults - Maximum results per page (default: 100)
+   * @param options.fields - Fields to include in response
+   * @param options.expand - Relations to expand (e.g., 'changelog')
+   * @returns Promise resolving to search results
+   * @example
+   * ```typescript
+   * const results = await client.searchIssues('project = MYPROJ AND status = Done');
+   * ```
+   */
   async searchIssues(
     jql: string,
     options: { startAt?: number; maxResults?: number; fields?: string[]; expand?: string[] } = {}

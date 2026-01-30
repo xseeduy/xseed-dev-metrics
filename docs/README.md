@@ -19,9 +19,11 @@ flowchart LR
 | [Architecture](architecture.md) | High-level design, layers, data flow, and integrations |
 | [Principles](principles.md) | Design principles (SPACE, DevEx) and philosophy |
 | [Good Practices](good-practices.md) | Coding standards, conventions, and patterns to follow |
+| [Code Documentation](code-documentation.md) | JSDoc documentation standards and guidelines |
 
 ## Quick Links
 
 - **Getting started**: See the root [README.md](../README.md) for installation and usage.
 - **Configuration**: `~/.xseed-metrics/config.json` and environment variables (see [Project Overview](project-overview.md#configuration)).
 - **Contributing**: Follow [Good Practices](good-practices.md) when adding or changing code.
+- **Code Documentation**: The entire codebase is documented with JSDoc. See [Code Documentation](code-documentation.md) for standards.
