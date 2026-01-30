@@ -22,6 +22,7 @@ import { configCommand } from './commands/config';
 import { initCommand, quickInitCommand } from './commands/init';
 import { collectCommand, showCommand } from './commands/collect';
 import { daemonCommand } from './commands/daemon';
+import { cleanCommand } from './commands/clean';
 import { XSEED_LOGO, printBanner, printCompactHeader } from './branding';
 import { isInitialized, getConfigStatus } from './config/integrations';
 
@@ -105,6 +106,14 @@ program
   .option('-n, --last <number>', 'Number of entries to show', '5')
   .option('-f, --format <type>', 'Output format: table, json', 'table')
   .action((options) => showCommand({ ...options, last: parseInt(options.last) }));
+
+// ==========================================
+// Clean Command
+// ==========================================
+program
+  .command('clean')
+  .description('Delete all configuration and data')
+  .action(() => cleanCommand());
 
 // ==========================================
 // Daemon Command

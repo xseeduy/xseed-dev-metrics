@@ -67,7 +67,6 @@ export class CrossPlatformScheduler {
   stop(): void {
     if (this.task) {
       this.task.stop();
-      this.task.destroy();
       this.task = undefined;
     }
     this.saveState({ enabled: false, expression: '' });

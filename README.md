@@ -103,6 +103,7 @@ export NOTION_AUTO_UPLOAD="true"
 | `gdm show` | View collected historical metrics |
 | `gdm status` | Show configuration status |
 | `gdm daemon start` | Enable automatic weekly collection |
+| `gdm clean` | Delete all configuration and data |
 
 **What `gdm collect` does:** pulls the latest from the repo, gathers Git metrics (commits, lines, activity, trends) for the configured user, optionally Jira metrics, and saves a snapshot to `~/.xseed-metrics/data/`. By default it collects **from 90 days ago until today**. You can change the range:
 
@@ -324,6 +325,23 @@ Collected metrics are stored in `~/.xseed-metrics/data/`:
 └── logs/
     └── daemon.log       # Scheduler logs
 ```
+
+### Cleaning Data
+
+To remove all configuration and collected data:
+
+```bash
+gdm clean
+```
+
+This command will:
+- Stop the daemon if it's running
+- Delete all configuration files (`config.json`)
+- Delete all collected metrics data
+- Delete all daemon logs
+- Remove daemon state files (PID, scheduler state)
+
+⚠️ **Warning**: This action is permanent and cannot be undone. After cleaning, run `gdm init` to set up again.
 
 ## 🔄 Workflow Example
 
