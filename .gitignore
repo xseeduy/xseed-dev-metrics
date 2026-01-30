@@ -1,0 +1,142 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# TypeScript
+*.d.ts.map
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.history/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+Thumbs.db
+Desktop.ini
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Runtime data
+lib-cov/
+.grunt/
+.lock-wscript/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.temp/
+tmp/
+
+# Config and data (user-specific)
+# Note: These are created at runtime by the CLI
+.xseed-metrics/
+config.json
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Plan files (Cursor-specific)
+.cursor/plans/
+
+# Application-specific
+# Scheduler state (created at runtime)
+scheduler-state.json
+daemon.pid
+
+# Test repositories (if any)
+test-repos/
+sample-data/
+
+# Distribution
+*.tgz
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache
+.parcel-cache/
+
+# Next.js build output
+.next/
+out/
+
+# Nuxt.js build / generate output
+.nuxt/
+dist/
+
+# Gatsby files
+.cache/
+public/
+
+# vuepress build output
+.vuepress/dist
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# Temporary folders
+tmp/
+temp/
