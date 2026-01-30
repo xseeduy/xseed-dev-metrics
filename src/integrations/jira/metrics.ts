@@ -7,31 +7,8 @@ import {
   WIPMetrics, BlockedTimeMetrics, ThroughputMetrics, BugRatioMetrics,
   JiraStatusMapping, DEFAULT_STATUS_MAPPING,
 } from './types';
-import { format, differenceInDays, differenceInWeeks, parseISO, getWeek, getYear } from 'date-fns';
-
-// Utility functions
-function median(values: number[]): number {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
-function percentile(values: number[], p: number): number {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const index = Math.ceil((p / 100) * sorted.length) - 1;
-  return sorted[Math.max(0, index)];
-}
-
-function avg(values: number[]): number {
-  if (!values.length) return 0;
-  return values.reduce((a, b) => a + b, 0) / values.length;
-}
-
-function getWeekKey(date: Date): string {
-  return `${getYear(date)}-W${String(getWeek(date)).padStart(2, '0')}`;
-}
+import { format, differenceInDays, differenceInWeeks, parseISO } from 'date-fns';
+import { median, percentile, avg, getWeekKey } from '../../utils/metrics-calculations';
 
 // Status helpers
 function isInProgressStatus(status: string, mapping: JiraStatusMapping): boolean {

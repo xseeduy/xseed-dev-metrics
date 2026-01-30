@@ -16,6 +16,8 @@ import {
   formatPeriodStats,
   formatBlameStats,
 } from '../output/formatters';
+import { JiraMetrics } from '../integrations/jira/types';
+import { DEFAULTS, DISPLAY, TIME_THRESHOLDS } from '../config/constants';
 
 type OutputFormat = 'table' | 'json' | 'csv' | 'markdown';
 
@@ -72,8 +74,9 @@ export async function summaryCommand(
     console.log(chalk.bold.cyan('\n📊 REPOSITORY SUMMARY\n'));
     const output = formatRepoSummary(summary, options.format || 'table');
     outputResult(output, options.output);
-  } catch (error: any) {
-    spinner.fail(chalk.red(`Error: ${error.message}`));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    spinner.fail(chalk.red(`Error: ${message}`));
     process.exit(1);
   }
 }
@@ -102,8 +105,9 @@ export async function authorsCommand(
     console.log(chalk.bold.cyan('\n👥 AUTHOR STATISTICS\n'));
     const output = formatAuthorStats(stats, options.format || 'table');
     outputResult(output, options.output);
-  } catch (error: any) {
-    spinner.fail(chalk.red(`Error: ${error.message}`));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    spinner.fail(chalk.red(`Error: ${message}`));
     process.exit(1);
   }
 }
@@ -121,15 +125,16 @@ export async function commitsCommand(
   try {
     const metrics = getMetrics(path);
     const filterOptions = buildFilterOptions(options);
-    const commits = metrics.getCommits(filterOptions, options.limit || 50);
+    const commits = metrics.getCommits(filterOptions, options.limit || DEFAULTS.COMMIT_LIMIT);
     
     spinner.stop();
     
     console.log(chalk.bold.cyan('\n📝 RECENT COMMITS\n'));
     const output = formatCommits(commits, options.format || 'table');
     outputResult(output, options.output);
-  } catch (error: any) {
-    spinner.fail(chalk.red(`Error: ${error.message}`));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    spinner.fail(chalk.red(`Error: ${message}`));
     process.exit(1);
   }
 }
@@ -154,8 +159,9 @@ export async function activityCommand(
     console.log(chalk.bold.cyan('\n⏰ ACTIVITY PATTERNS\n'));
     const output = formatTimeStats(stats, options.format || 'table');
     outputResult(output, options.output);
-  } catch (error: any) {
-    spinner.fail(chalk.red(`Error: ${error.message}`));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    spinner.fail(chalk.red(`Error: ${message}`));
     process.exit(1);
   }
 }
@@ -173,15 +179,16 @@ export async function filesCommand(
   try {
     const metrics = getMetrics(path);
     const filterOptions = buildFilterOptions(options);
-    const stats = metrics.getFileStats(filterOptions, options.limit || 20);
+    const stats = metrics.getFileStats(filterOptions, options.limit || DEFAULTS.FILE_LIMIT);
     
     spinner.stop();
     
     console.log(chalk.bold.cyan('\n📁 MOST CHANGED FILES\n'));
     const output = formatFileStats(stats, options.format || 'table');
     outputResult(output, options.output);
-  } catch (error: any) {
-    spinner.fail(chalk.red(`Error: ${error.message}`));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    spinner.fail(chalk.red(`Error: ${message}`));
     process.exit(1);
   }
 }
@@ -206,8 +213,9 @@ export async function trendsCommand(
     console.log(chalk.bold.cyan(`\n📈 ACTIVITY BY ${(options.groupBy || 'month').toUpperCase()}\n`));
     const output = formatPeriodStats(stats, options.format || 'table');
     outputResult(output, options.output);
-  } catch (error: any) {
-    spinner.fail(chalk.red(`Error: ${error.message}`));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    spinner.fail(chalk.red(`Error: ${message}`));
     process.exit(1);
   }
 }
@@ -231,8 +239,9 @@ export async function blameCommand(
     console.log(chalk.bold.cyan('\n🔍 CODE OWNERSHIP\n'));
     const output = formatBlameStats(stats, options.format || 'table');
     outputResult(output, options.output);
-  } catch (error: any) {
-    spinner.fail(chalk.red(`Error: ${error.message}`));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    spinner.fail(chalk.red(`Error: ${message}`));
     process.exit(1);
   }
 }
@@ -253,7 +262,7 @@ export async function reportCommand(
     const format = options.format || 'table';
     
     // Get Jira metrics if requested
-    let jiraMetrics: any = null;
+    let jiraMetrics: JiraMetrics | null = null;
     if (options.jira) {
       spinner.text = 'Fetching Jira metrics...';
       jiraMetrics = await getJiraMetricsForReport(options.jira, filterOptions.since, filterOptions.until);
@@ -265,7 +274,7 @@ export async function reportCommand(
 
     if (isJson) {
       // JSON: single object with all data
-      const report: any = {
+      const report = {
         repository: path,
         period: { since: filterOptions.since || 'all time', until: filterOptions.until || 'now' },
         git_metrics: {
@@ -324,8 +333,9 @@ export async function reportCommand(
 
     spinner.stop();
     outputResult(output, options.output);
-  } catch (error: any) {
-    spinner.fail(chalk.red(`Error: ${error.message}`));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    spinner.fail(chalk.red(`Error: ${message}`));
     process.exit(1);
   }
 }
@@ -357,13 +367,16 @@ async function getJiraMetricsForReport(projectKey: string, since?: string, until
     });
     
     return calculateJiraMetrics(issues, { since, until });
-  } catch (error: any) {
-    return { available: false, reason: error.message };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return { available: false, reason: message } as any;
   }
 }
 
 // Format Jira metrics for table/markdown
-function formatJiraMetricsSection(metrics: any, format: string, isMarkdown: boolean): string {
+function formatJiraMetricsSection(metrics: JiraMetrics | null, format: string, isMarkdown: boolean): string {
+  if (!metrics) return '';
+  
   if (format === 'json') return JSON.stringify(metrics, null, 2);
   
   let output = '';
@@ -458,8 +471,9 @@ export async function fileTypesCommand(
       
       outputResult(table.toString(), options.output);
     }
-  } catch (error: any) {
-    spinner.fail(chalk.red(`Error: ${error.message}`));
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    spinner.fail(chalk.red(`Error: ${message}`));
     process.exit(1);
   }
 }

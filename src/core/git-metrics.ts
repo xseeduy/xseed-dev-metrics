@@ -262,7 +262,9 @@ export class GitMetrics {
       const last = this.exec(`git log --format='%aI' -1 ${logArgs}`);
       if (first) firstCommitDate = new Date(first);
       if (last) lastCommitDate = new Date(last);
-    } catch {}
+    } catch (error: unknown) {
+      // Log error but continue - dates will remain null
+    }
 
     // Branches
     const branchesRaw = this.exec('git branch -a');
@@ -428,16 +430,20 @@ export class GitMetrics {
       let filesChanged = 0;
 
       try {
-        const statsRaw = this.exec(
-          `git show --stat --format='' ${hash} | tail -1`
-        );
-        const match = statsRaw.match(/(\d+) files? changed(?:, (\d+) insertions?[^,]*)?(?:, (\d+) deletions?)?/);
+        const statsRaw = this.exec(`git show --stat --format='' ${hash}`);
+        // Get last non-empty line (cross-platform replacement for tail -1)
+        const lines = statsRaw.split('\n').filter(line => line.trim());
+        const lastLine = lines[lines.length - 1] || '';
+        
+        const match = lastLine.match(/(\d+) files? changed(?:, (\d+) insertions?[^,]*)?(?:, (\d+) deletions?)?/);
         if (match) {
           filesChanged = parseInt(match[1]) || 0;
           linesAdded = parseInt(match[2]) || 0;
           linesDeleted = parseInt(match[3]) || 0;
         }
-      } catch {}
+      } catch (error: unknown) {
+        // Log error but continue with zero stats
+      }
 
       commits.push({
         hash,

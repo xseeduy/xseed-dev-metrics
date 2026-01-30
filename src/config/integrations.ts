@@ -2,9 +2,19 @@
 // Integration Configuration Manager
 // ============================================
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { CONFIG } from './constants';
+import {
+  validateUrl,
+  validateEmail,
+  validateApiKey,
+  validateBranchName,
+  validateFilePath,
+  validateTimeFormat,
+  validateDayOfWeek,
+} from '../utils/validation';
 
 // ==========================================
 // Types
@@ -142,12 +152,18 @@ const LOGS_DIR = join(CONFIG_DIR, 'logs');
 
 /**
  * Ensures that all required configuration directories exist.
- * Creates directories if they don't exist.
+ * Creates directories if they don't exist and sets appropriate permissions.
  */
 export function ensureConfigDirs(): void {
   [CONFIG_DIR, DATA_DIR, LOGS_DIR].forEach(dir => {
     if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
+      mkdirSync(dir, { recursive: true, mode: CONFIG.CONFIG_DIR_PERMISSIONS });
+    }
+    // Ensure permissions are set even if directory already exists
+    try {
+      chmodSync(dir, CONFIG.CONFIG_DIR_PERMISSIONS);
+    } catch {
+      // Permission change might fail on some systems, but we continue
     }
   });
 }
@@ -166,9 +182,14 @@ export function ensureConfigDirs(): void {
 function readConfigFile(): IntegrationConfig {
   try {
     if (existsSync(CONFIG_FILE)) {
-      return JSON.parse(readFileSync(CONFIG_FILE, 'utf-8'));
+      const content = readFileSync(CONFIG_FILE, 'utf-8');
+      return JSON.parse(content);
     }
-  } catch {}
+  } catch (error: unknown) {
+    // Log error but don't crash - return empty config
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`Failed to read config file: ${errorMessage}`);
+  }
   return {};
 }
 
@@ -335,16 +356,122 @@ export function getConfigStatus(): ConfigStatus {
 // ==========================================
 
 /**
+ * Validates configuration before saving
+ * @param config - Configuration to validate
+ * @throws Error if validation fails
+ * @private
+ */
+function validateConfig(config: Partial<IntegrationConfig>): void {
+  // Validate Jira config
+  if (config.jira) {
+    const urlResult = validateUrl(config.jira.url);
+    if (!urlResult.valid) {
+      throw new Error(`Invalid Jira URL: ${urlResult.error}`);
+    }
+
+    const emailResult = validateEmail(config.jira.email);
+    if (!emailResult.valid) {
+      throw new Error(`Invalid Jira email: ${emailResult.error}`);
+    }
+
+    const tokenResult = validateApiKey(config.jira.token);
+    if (!tokenResult.valid) {
+      throw new Error(`Invalid Jira token: ${tokenResult.error}`);
+    }
+  }
+
+  // Validate Linear config
+  if (config.linear) {
+    const apiKeyResult = validateApiKey(config.linear.apiKey);
+    if (!apiKeyResult.valid) {
+      throw new Error(`Invalid Linear API key: ${apiKeyResult.error}`);
+    }
+  }
+
+  // Validate Notion config
+  if (config.notion) {
+    const apiKeyResult = validateApiKey(config.notion.apiKey);
+    if (!apiKeyResult.valid) {
+      throw new Error(`Invalid Notion API key: ${apiKeyResult.error}`);
+    }
+
+    // ParentPageId should be non-empty
+    if (!config.notion.parentPageId || config.notion.parentPageId.trim().length === 0) {
+      throw new Error('Notion parent page ID is required');
+    }
+  }
+
+  // Validate Git config
+  if (config.git) {
+    if (config.git.email) {
+      const emailResult = validateEmail(config.git.email);
+      if (!emailResult.valid) {
+        throw new Error(`Invalid Git email: ${emailResult.error}`);
+      }
+    }
+
+    if (config.git.mainBranch) {
+      const branchResult = validateBranchName(config.git.mainBranch);
+      if (!branchResult.valid) {
+        throw new Error(`Invalid Git branch name: ${branchResult.error}`);
+      }
+    }
+  }
+
+  // Validate Scheduler config
+  if (config.scheduler) {
+    if (config.scheduler.time) {
+      const timeResult = validateTimeFormat(config.scheduler.time);
+      if (!timeResult.valid) {
+        throw new Error(`Invalid scheduler time: ${timeResult.error}`);
+      }
+    }
+
+    if (config.scheduler.dayOfWeek !== undefined) {
+      const dayResult = validateDayOfWeek(config.scheduler.dayOfWeek);
+      if (!dayResult.valid) {
+        throw new Error(`Invalid scheduler day of week: ${dayResult.error}`);
+      }
+    }
+  }
+
+  // Validate repositories
+  if (config.repositories) {
+    for (const repo of config.repositories) {
+      const pathResult = validateFilePath(repo);
+      if (!pathResult.valid) {
+        throw new Error(`Invalid repository path: ${pathResult.error}`);
+      }
+    }
+  }
+}
+
+/**
  * Saves configuration to disk.
- * Merges with existing configuration and sets version.
+ * Merges with existing configuration, validates, and sets file permissions.
  * 
  * @param config - Partial configuration to save
+ * @throws Error if validation fails or file cannot be written
  */
 export function saveConfig(config: Partial<IntegrationConfig>): void {
+  // Validate configuration before saving
+  validateConfig(config);
+
   ensureConfigDirs();
   const existing = readConfigFile();
-  const newConfig = { ...existing, ...config, version: '1.0.0' };
+  const newConfig = { ...existing, ...config, version: CONFIG.VERSION };
+  
+  // Write config file
   writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2));
+  
+  // Set restrictive file permissions (user read/write only)
+  try {
+    chmodSync(CONFIG_FILE, CONFIG.CONFIG_FILE_PERMISSIONS);
+  } catch (error: unknown) {
+    // Log warning but don't fail if permissions can't be set
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.warn(`Warning: Could not set config file permissions: ${errorMessage}`);
+  }
 }
 
 /**

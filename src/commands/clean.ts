@@ -25,7 +25,9 @@ function getPid(): number | null {
       const pid = parseInt(readFileSync(PID_FILE, 'utf-8').trim());
       return isNaN(pid) ? null : pid;
     }
-  } catch {}
+  } catch (error: unknown) {
+    // Failed to read PID file, return null
+  }
   return null;
 }
 
@@ -34,7 +36,9 @@ function removePid(): void {
     if (existsSync(PID_FILE)) {
       unlinkSync(PID_FILE);
     }
-  } catch {}
+  } catch (error: unknown) {
+    // Failed to remove PID file, but continue anyway
+  }
 }
 
 function isRunning(pid: number): boolean {

@@ -113,11 +113,15 @@ function detectGitUser(): { username: string; email: string } {
   
   try {
     username = execSync('git config --global user.name', { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
-  } catch {}
+  } catch (error: unknown) {
+    // Git username not configured globally, will prompt user
+  }
   
   try {
     email = execSync('git config --global user.email', { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
-  } catch {}
+  } catch (error: unknown) {
+    // Git email not configured globally, will prompt user
+  }
   
   return { username, email };
 }

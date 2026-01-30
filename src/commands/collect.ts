@@ -19,6 +19,7 @@ import { GitMetrics } from '../core/git-metrics';
 import { JiraClient } from '../integrations/jira/client';
 import { calculateJiraMetrics } from '../integrations/jira/metrics';
 import { printCompactHeader, printSuccess, printError, printWarning, printSection } from '../branding';
+import { DEFAULTS, TIME_THRESHOLDS } from '../config/constants';
 
 interface CollectedData {
   collectedAt: string;
@@ -64,7 +65,9 @@ function gitPull(repoPath: string, branch: string): { success: boolean; message:
     if (currentBranch !== branch) {
       try {
         execSync('git stash', { cwd: repoPath, stdio: ['pipe', 'pipe', 'pipe'] });
-      } catch {}
+      } catch (error: unknown) {
+        // Stash might fail if there are no changes, which is fine
+      }
       
       execSync(`git checkout ${branch}`, {
         cwd: repoPath,
@@ -188,7 +191,7 @@ async function collectRepoMetrics(
 ): Promise<CollectedData> {
   const metrics = new GitMetrics(repoPath);
   const now = new Date();
-  const defaultSince = format(new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+  const defaultSince = format(new Date(now.getTime() - DEFAULTS.COLLECTION_DAYS * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
   const defaultUntil = format(now, 'yyyy-MM-dd');
 
   const filterOptions =
@@ -286,10 +289,14 @@ export function loadHistoricalData(repoName: string, limit: number = 10): Collec
         try {
           const content = readFileSync(join(dataDir, entry), 'utf-8');
           files.push(JSON.parse(content));
-        } catch {}
+        } catch (error: unknown) {
+          // Failed to parse JSON file, skip it
+        }
       }
     }
-  } catch {}
+  } catch (error: unknown) {
+    // Failed to read data directory, return empty array
+  }
   
   return files
     .sort((a, b) => new Date(b.collectedAt).getTime() - new Date(a.collectedAt).getTime())
@@ -363,7 +370,7 @@ export async function collectCommand(options: {
   }
 
   const now = new Date();
-  const defaultSince = format(new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+  const defaultSince = format(new Date(now.getTime() - DEFAULTS.COLLECTION_DAYS * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
   const defaultUntil = format(now, 'yyyy-MM-dd');
   const filterOptions = options.total
     ? {}
@@ -557,7 +564,9 @@ export async function collectCommand(options: {
             const fileContent = readFileSync(filePath, 'utf-8');
             const data = JSON.parse(fileContent) as CollectedData;
             filesToUpload.push({ path: filePath, data });
-          } catch {}
+          } catch (error: unknown) {
+            // Failed to read or parse file, skip it
+          }
         }
       }
     }

@@ -67,8 +67,12 @@ export class NotionClient {
   async testConnection(): Promise<{ success: boolean; user?: string; error?: string }> {
     try {
       const response = await this.client.users.me({});
-      const user = (response as any).name || (response as any).bot?.owner?.user?.name || 'Bot';
-      return { success: true, user };
+      // Extract user name from Notion API response (can be user or bot)
+      const userName = 
+        (response as { name?: string }).name || 
+        (response as { bot?: { owner?: { user?: { name?: string } } } }).bot?.owner?.user?.name || 
+        'Bot';
+      return { success: true, user: userName };
     } catch (error: unknown) {
       return { success: false, error: (error as Error).message };
     }
@@ -96,7 +100,7 @@ export class NotionClient {
 
       for (const result of searchResults.results) {
         if (result.object === 'page' && 'parent' in result) {
-          const parent = result.parent as any;
+          const parent = result.parent as { type?: string; page_id?: string };
           if (parent.type === 'page_id' && parent.page_id === this.config.parentPageId) {
             const pageId = result.id;
             this.pageCache.set(cacheKey, pageId);
@@ -104,7 +108,9 @@ export class NotionClient {
           }
         }
       }
-    } catch {}
+    } catch (error: unknown) {
+      // Search failed, will create new page
+    }
 
     // Create new "Git Metrics" page
     const response = await this.client.pages.create({
@@ -144,8 +150,8 @@ export class NotionClient {
 
       for (const block of response.results) {
         if ('type' in block && block.type === 'child_page' && 'child_page' in block) {
-          const title = (block as any).child_page?.title;
-          if (title === clientName) {
+          const childPage = (block as { child_page?: { title?: string } }).child_page;
+          if (childPage?.title === clientName) {
             const pageId = block.id;
             this.pageCache.set(cacheKey, pageId);
             return pageId;
@@ -186,8 +192,8 @@ export class NotionClient {
 
       for (const block of response.results) {
         if ('type' in block && block.type === 'child_page' && 'child_page' in block) {
-          const title = (block as any).child_page?.title;
-          if (title === username) {
+          const childPage = (block as { child_page?: { title?: string } }).child_page;
+          if (childPage?.title === username) {
             const pageId = block.id;
             this.pageCache.set(cacheKey, pageId);
             return pageId;

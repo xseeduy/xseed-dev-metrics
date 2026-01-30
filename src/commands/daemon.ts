@@ -30,7 +30,9 @@ function getPid(): number | null {
       const pid = parseInt(readFileSync(PID_FILE, 'utf-8').trim());
       return isNaN(pid) ? null : pid;
     }
-  } catch {}
+  } catch (error: unknown) {
+    // Failed to read PID file, return null
+  }
   return null;
 }
 
@@ -43,7 +45,9 @@ function removePid(): void {
     if (existsSync(PID_FILE)) {
       unlinkSync(PID_FILE);
     }
-  } catch {}
+  } catch (error: unknown) {
+    // Failed to remove PID file, but continue anyway
+  }
 }
 
 function isRunning(pid: number): boolean {
@@ -140,14 +144,18 @@ async function runDaemonMode(cronExpression: string): Promise<void> {
   const logMessage = `[${new Date().toISOString()}] Scheduler daemon started with expression: ${cronExpression}\n`;
   try {
     appendFileSync(LOG_FILE, logMessage);
-  } catch {}
+  } catch (error: unknown) {
+    // Failed to write to log file, continue anyway
+  }
 
   // Start the scheduler
   const started = scheduler.start(cronExpression, async () => {
     const timestamp = new Date().toISOString();
     try {
       appendFileSync(LOG_FILE, `[${timestamp}] Running scheduled collection...\n`);
-    } catch {}
+    } catch (error: unknown) {
+      // Failed to write to log file
+    }
 
     // Run collection
     try {
@@ -156,12 +164,16 @@ async function runDaemonMode(cronExpression: string): Promise<void> {
       
       try {
         appendFileSync(LOG_FILE, `[${timestamp}] Collection completed successfully\n`);
-      } catch {}
+      } catch (error: unknown) {
+        // Failed to write to log file
+      }
     } catch (error) {
       const errorMsg = `[${timestamp}] Collection failed: ${(error as Error).message}\n`;
       try {
         appendFileSync(LOG_FILE, errorMsg);
-      } catch {}
+      } catch (logError: unknown) {
+        // Failed to write error to log file
+      }
     }
   });
 
@@ -176,7 +188,9 @@ async function runDaemonMode(cronExpression: string): Promise<void> {
     const shutdownMsg = `[${new Date().toISOString()}] Scheduler daemon stopped\n`;
     try {
       appendFileSync(LOG_FILE, shutdownMsg);
-    } catch {}
+    } catch (error: unknown) {
+      // Failed to write to log file
+    }
     process.exit(0);
   });
 
