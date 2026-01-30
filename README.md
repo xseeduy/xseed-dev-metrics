@@ -100,7 +100,7 @@ export NOTION_AUTO_UPLOAD="true"
 |---------|-------------|
 | `gdm init` | Interactive setup wizard (add/update client) |
 | `gdm init --force` | Add a new client (when already configured) |
-| `gdm collect` | Collect metrics from repositories |
+| `gdm collect` | Collect metrics from repositories (default: last 7 days) |
 | `gdm show` | View collected historical metrics |
 | `gdm status` | Show configuration status |
 | `gdm daemon start` | Enable automatic weekly collection |
@@ -191,11 +191,12 @@ Repository not configured: /path/to/repo
 
 Repositories can belong to multiple clients if needed (useful for shared libraries).
 
-**What `gdm collect` does:** pulls the latest from the repo, gathers Git metrics (commits, lines, activity, trends) for the configured user, optionally Jira metrics, and saves a snapshot to `~/.xseed-metrics/data/`. By default it collects **from 90 days ago until today**. You can change the range:
+**What `gdm collect` does:** pulls the latest from the repo, gathers Git metrics (commits, lines, activity, trends) for the configured user, optionally Jira metrics, and saves a snapshot to `~/.xseed-metrics/data/`. By default it collects **from 7 days ago until today** (last week). You can change the range:
 
 ```bash
-gdm collect                    # Last 90 days (default)
+gdm collect                    # Last 7 days (default)
 gdm collect -t                 # All time (--total)
+gdm collect --since="30 days ago" # Last 30 days
 gdm collect --since=2024-01-01 # From a start date until today
 gdm collect -s 2024-01-01 -u 2024-12-31  # Custom range (--since / --until)
 ```

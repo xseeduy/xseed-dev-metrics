@@ -82,13 +82,13 @@ program
 // ==========================================
 program
   .command('collect')
-  .description('Collect metrics from configured repositories')
+  .description('Collect metrics from configured repositories (default: last 7 days)')
   .option('-r, --repo <path>', 'Specific repository to collect from')
   .option('-c, --client <name>', 'Collect for specific client')
   .option('-a, --all', 'Collect from all configured repositories')
   .option('--no-pull', 'Skip git pull before collecting')
   .option('-t, --total', 'Collect all-time metrics (no date range)')
-  .option('-s, --since <date>', 'Start date for metrics (e.g. 2024-01-01)')
+  .option('-s, --since <date>', 'Start date for metrics (e.g. 2024-01-01, "30 days ago")')
   .option('-u, --until <date>', 'End date for metrics (e.g. 2024-12-31)')
   .option('--usernames <list>', 'Collect for specific users (comma-separated) or ALL')
   .option('--jira <project>', 'Include Jira project metrics')
@@ -289,7 +289,8 @@ program.addHelpText('after', `
 ${chalk.bold('Quick Start:')}
   ${chalk.cyan('gdm init')}           Interactive setup wizard
   ${chalk.cyan('gdm init --force')}   Add another client (when already configured)
-  ${chalk.cyan('gdm collect')}        Collect metrics from repos
+  ${chalk.cyan('gdm collect')}        Collect metrics (default: last 7 days)
+  ${chalk.cyan('gdm collect -t')}     Collect all-time metrics
   ${chalk.cyan('gdm show')}           View collected metrics
   ${chalk.cyan('gdm daemon start')}   Enable weekly auto-collection
 

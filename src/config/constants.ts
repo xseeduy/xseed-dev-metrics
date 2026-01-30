@@ -13,7 +13,7 @@ export const DEFAULTS = {
   /** Default file limit for commands */
   FILE_LIMIT: 10,
   /** Default number of days to collect metrics for */
-  COLLECTION_DAYS: 90,
+  COLLECTION_DAYS: 7,
   /** Default number of entries to show in historical data */
   SHOW_LAST_ENTRIES: 5,
   /** Default top items to show in reports */
