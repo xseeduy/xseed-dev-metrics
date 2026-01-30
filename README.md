@@ -99,6 +99,7 @@ export NOTION_AUTO_UPLOAD="true"
 | Command | Description |
 |---------|-------------|
 | `gdm init` | Interactive setup wizard (add/update client) |
+| `gdm init --force` | Add a new client (when already configured) |
 | `gdm collect` | Collect metrics from repositories |
 | `gdm show` | View collected historical metrics |
 | `gdm status` | Show configuration status |
@@ -119,11 +120,26 @@ The CLI supports managing multiple clients (organizations/projects) with separat
 
 ### Adding a New Client
 
-Run `gdm init` to create or update a client:
+**First time setup:**
 
 ```bash
 gdm init
 ```
+
+**Adding another client (when already configured):**
+
+If you navigate to a different repository and want to add a new client, use the `--force` flag:
+
+```bash
+cd /path/to/different/repository
+gdm init --force
+```
+
+The wizard will guide you through:
+1. **Client Name** - Enter a NEW name (e.g., "GIVEFINITY" instead of "XSEED")
+2. **Git Configuration** - Your Git username and email
+3. **Repository** - The current directory will be detected
+4. **Integrations** - Optional Jira, Linear, Notion setup
 
 If a client with that name already exists, you'll be asked if you want to reconfigure it or create a new client.
 

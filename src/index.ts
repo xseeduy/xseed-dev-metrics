@@ -44,12 +44,12 @@ program
   .version('1.0.0');
 
 // ==========================================
-// Init Command (first-time configuration)
+// Init Command (add/update clients)
 // ==========================================
 program
   .command('init')
-  .description('Interactive setup wizard for first-time configuration')
-  .option('--force', 'Reconfigure even if already set up')
+  .description('Interactive setup wizard (add/update clients)')
+  .option('--force', 'Add new client or reconfigure existing (required when already configured)')
   .option('--client-name <name>', 'Client/organization name, stored in uppercase (non-interactive)')
   .option('--username <name>', 'Git username (non-interactive)')
   .option('--email <email>', 'Git email (non-interactive)')
@@ -288,6 +288,7 @@ program.command('config').description('Manage integration configurations')
 program.addHelpText('after', `
 ${chalk.bold('Quick Start:')}
   ${chalk.cyan('gdm init')}           Interactive setup wizard
+  ${chalk.cyan('gdm init --force')}   Add another client (when already configured)
   ${chalk.cyan('gdm collect')}        Collect metrics from repos
   ${chalk.cyan('gdm show')}           View collected metrics
   ${chalk.cyan('gdm daemon start')}   Enable weekly auto-collection
