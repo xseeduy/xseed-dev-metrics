@@ -322,7 +322,7 @@ export function getConfig(): ClientConfig | null {
   const fullConfig = readConfigFile();
   const activeClient = fullConfig.activeClient;
   
-  if (!activeClient || !fullConfig.clients[activeClient]) {
+  if (!activeClient || !fullConfig.clients || !fullConfig.clients[activeClient]) {
     return null;
   }
   
@@ -346,7 +346,7 @@ export function getConfig(): ClientConfig | null {
  */
 export function getClientConfig(clientName: string): ClientConfig | null {
   const fullConfig = readConfigFile();
-  return fullConfig.clients[clientName] || null;
+  return fullConfig.clients?.[clientName] || null;
 }
 
 /**
@@ -400,7 +400,10 @@ export function getNotionConfig(): NotionConfig | null {
  */
 export function isInitialized(): boolean {
   const fullConfig = readConfigFile();
-  return fullConfig.initialized === true && Object.keys(fullConfig.clients).length > 0;
+  return fullConfig.initialized === true && 
+         fullConfig.clients !== undefined && 
+         fullConfig.clients !== null &&
+         Object.keys(fullConfig.clients).length > 0;
 }
 
 /**
@@ -411,7 +414,7 @@ export function isInitialized(): boolean {
  */
 export function clientExists(clientName: string): boolean {
   const fullConfig = readConfigFile();
-  return !!fullConfig.clients[clientName];
+  return !!fullConfig.clients?.[clientName];
 }
 
 /**
@@ -423,7 +426,7 @@ export function clientExists(clientName: string): boolean {
 export function switchClient(clientName: string): void {
   const fullConfig = readConfigFile();
   
-  if (!fullConfig.clients[clientName]) {
+  if (!fullConfig.clients || !fullConfig.clients[clientName]) {
     throw new Error(`Client '${clientName}' does not exist`);
   }
   
@@ -440,6 +443,10 @@ export function switchClient(clientName: string): void {
  */
 export function addClient(clientName: string, config: ClientConfig, setActive: boolean = true): void {
   const fullConfig = readConfigFile();
+  
+  if (!fullConfig.clients) {
+    fullConfig.clients = {};
+  }
   
   fullConfig.clients[clientName] = config;
   fullConfig.initialized = true;
@@ -461,7 +468,7 @@ export function addClient(clientName: string, config: ClientConfig, setActive: b
 export function removeClient(clientName: string): boolean {
   const fullConfig = readConfigFile();
   
-  if (!fullConfig.clients[clientName]) {
+  if (!fullConfig.clients || !fullConfig.clients[clientName]) {
     return false;
   }
   
@@ -491,35 +498,37 @@ export function getConfigStatus(): ConfigStatus {
   const fullConfig = readConfigFile();
   const activeClientName = fullConfig.activeClient;
   
-  const clients: ClientStatus[] = Object.entries(fullConfig.clients).map(([name, config]) => {
-    return {
-      name,
-      active: name === activeClientName,
-      repositories: config.repositories.length,
-      git: {
-        configured: !!(config.git?.username && config.git?.email),
-        username: config.git?.username,
-        email: config.git?.email,
-        mainBranch: config.git?.mainBranch,
-      },
-      jira: {
-        configured: !!(config.jira?.url && config.jira?.token),
-        url: config.jira?.url,
-        email: config.jira?.email,
-      },
-      linear: {
-        configured: !!config.linear?.apiKey,
-      },
-      notion: {
-        configured: !!(config.notion?.enabled && config.notion?.apiKey && config.notion?.parentPageId),
-        enabled: config.notion?.enabled,
-      },
-      scheduler: {
-        enabled: config.scheduler?.enabled || false,
-        interval: config.scheduler?.interval,
-      },
-    };
-  });
+  const clients: ClientStatus[] = fullConfig.clients 
+    ? Object.entries(fullConfig.clients).map(([name, config]) => {
+        return {
+          name,
+          active: name === activeClientName,
+          repositories: config.repositories.length,
+          git: {
+            configured: !!(config.git?.username && config.git?.email),
+            username: config.git?.username,
+            email: config.git?.email,
+            mainBranch: config.git?.mainBranch,
+          },
+          jira: {
+            configured: !!(config.jira?.url && config.jira?.token),
+            url: config.jira?.url,
+            email: config.jira?.email,
+          },
+          linear: {
+            configured: !!config.linear?.apiKey,
+          },
+          notion: {
+            configured: !!(config.notion?.enabled && config.notion?.apiKey && config.notion?.parentPageId),
+            enabled: config.notion?.enabled,
+          },
+          scheduler: {
+            enabled: config.scheduler?.enabled || false,
+            interval: config.scheduler?.interval,
+          },
+        };
+      })
+    : [];
 
   return {
     initialized: fullConfig.initialized,
@@ -664,6 +673,11 @@ export function saveConfig(config: Partial<ClientConfig>): void {
   // Validate configuration before saving
   validateClientConfig(config);
   
+  // Ensure clients object exists
+  if (!fullConfig.clients) {
+    fullConfig.clients = {};
+  }
+  
   // Get existing client config or create new one
   const existingClientConfig = fullConfig.clients[activeClient] || { repositories: [] };
   const newClientConfig: ClientConfig = {
@@ -686,7 +700,7 @@ export function saveConfig(config: Partial<ClientConfig>): void {
 export function saveClientConfig(clientName: string, config: Partial<ClientConfig>): void {
   const fullConfig = readConfigFile();
   
-  if (!fullConfig.clients[clientName]) {
+  if (!fullConfig.clients || !fullConfig.clients[clientName]) {
     throw new Error(`Client '${clientName}' does not exist`);
   }
   
@@ -809,6 +823,10 @@ export function removeRepository(repoPath: string): void {
 export function findRepositoryOwners(repoPath: string): string[] {
   const fullConfig = readConfigFile();
   const owners: string[] = [];
+  
+  if (!fullConfig.clients) {
+    return owners;
+  }
   
   for (const [clientName, config] of Object.entries(fullConfig.clients)) {
     if (config.repositories.includes(repoPath)) {

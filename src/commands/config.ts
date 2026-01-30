@@ -35,30 +35,40 @@ async function checkConfig(testConnections: boolean): Promise<void> {
 
   console.log(chalk.bold.cyan('\n🔧 INTEGRATION CONFIGURATION\n'));
 
+  if (!status.initialized || !status.activeClient) {
+    console.log(chalk.yellow('⚠ No configuration found. Run gdm init to set up.\n'));
+    return;
+  }
+
+  const activeClientStatus = status.clients.find(c => c.active);
+  if (!activeClientStatus) {
+    console.log(chalk.yellow(`⚠ Active client '${status.activeClient}' not found.\n`));
+    return;
+  }
+
+  console.log(chalk.gray(`Active Client: ${chalk.cyan(activeClientStatus.name)}\n`));
+
   const table = new Table({
-    head: [chalk.cyan('Integration'), chalk.cyan('Status'), chalk.cyan('Source'), chalk.cyan('Details')],
-    colWidths: [12, 18, 10, 40],
+    head: [chalk.cyan('Integration'), chalk.cyan('Status'), chalk.cyan('Details')],
+    colWidths: [12, 18, 50],
   });
 
   table.push([
     'Jira',
-    status.jira.configured ? chalk.green('✓ Configured') : chalk.gray('Not configured'),
-    status.jira.source || '-',
-    status.jira.configured ? `${status.jira.url}` : '-',
+    activeClientStatus.jira.configured ? chalk.green('✓ Configured') : chalk.gray('Not configured'),
+    activeClientStatus.jira.configured ? `${activeClientStatus.jira.url}` : '-',
   ]);
 
   table.push([
     'Linear',
-    status.linear.configured ? chalk.green('✓ Configured') : chalk.gray('Not configured'),
-    status.linear.source || '-',
-    status.linear.configured ? 'API Key set' : '-',
+    activeClientStatus.linear.configured ? chalk.green('✓ Configured') : chalk.gray('Not configured'),
+    activeClientStatus.linear.configured ? 'API Key set' : '-',
   ]);
 
   table.push([
     'Notion',
-    status.notion.configured ? chalk.green('✓ Configured') : chalk.gray('Not configured'),
-    status.notion.source || '-',
-    status.notion.configured ? (status.notion.enabled ? 'Enabled' : 'Disabled') : '-',
+    activeClientStatus.notion.configured ? chalk.green('✓ Configured') : chalk.gray('Not configured'),
+    activeClientStatus.notion.configured ? (activeClientStatus.notion.enabled ? 'Enabled' : 'Disabled') : '-',
   ]);
 
   console.log(table.toString());
@@ -68,7 +78,7 @@ async function checkConfig(testConnections: boolean): Promise<void> {
   if (testConnections) {
     console.log(chalk.bold('Testing connections...\n'));
     
-    if (status.jira.configured) {
+    if (activeClientStatus.jira.configured) {
       process.stdout.write('  Jira: ');
       try {
         const config = getJiraConfig();
@@ -86,7 +96,7 @@ async function checkConfig(testConnections: boolean): Promise<void> {
       }
     }
 
-    if (status.linear.configured) {
+    if (activeClientStatus.linear.configured) {
       process.stdout.write('  Linear: ');
       try {
         const { getLinearConfig } = await import('../config/integrations');
@@ -106,7 +116,7 @@ async function checkConfig(testConnections: boolean): Promise<void> {
       }
     }
 
-    if (status.notion.configured) {
+    if (activeClientStatus.notion.configured) {
       process.stdout.write('  Notion: ');
       try {
         const { getNotionConfig } = await import('../config/integrations');
@@ -129,7 +139,7 @@ async function checkConfig(testConnections: boolean): Promise<void> {
     console.log('');
   }
 
-  if (!status.jira.configured && !status.linear.configured && !status.notion.configured) {
+  if (!activeClientStatus.jira.configured && !activeClientStatus.linear.configured && !activeClientStatus.notion.configured) {
     showSetupInstructions();
   }
 }

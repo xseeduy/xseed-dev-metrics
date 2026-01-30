@@ -70,6 +70,10 @@ function isRunning(pid: number): boolean {
 function startDaemon(): { success: boolean; message: string; pid?: number } {
   try {
     const config = getConfig();
+    if (!config) {
+      return { success: false, message: 'No configuration found. Run gdm init first.' };
+    }
+    
     const scheduler = config.scheduler;
 
     if (!scheduler?.enabled) {
@@ -218,6 +222,11 @@ export async function daemonCommand(action: string): Promise<void> {
   printCompactHeader();
 
   const config = getConfig();
+
+  if (!config) {
+    printError('No configuration found. Run gdm init first.');
+    return;
+  }
 
   switch (action) {
     case 'start': {
