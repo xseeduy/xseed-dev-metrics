@@ -152,7 +152,7 @@ function showSetupInstructions(): void {
   console.log(chalk.gray('  export JIRA_TOKEN=your_api_token'));
   console.log(chalk.gray('  # Get token: https://id.atlassian.com/manage-profile/security/api-tokens\n'));
   console.log(chalk.bold.cyan('Option 2: Config File\n'));
-  console.log(chalk.gray(`  Run: git-dev-metrics config --init\n`));
+  console.log(chalk.gray(`  Run: gdm config --init\n`));
 }
 
 async function initConfig(): Promise<void> {
@@ -185,6 +185,6 @@ async function initConfig(): Promise<void> {
   console.log(chalk.green(`\n✓ Created config at: ${configPath}\n`));
   console.log(chalk.bold('Next steps:'));
   console.log(chalk.gray('  1. Edit the config file with your credentials'));
-  console.log(chalk.gray('  2. Run: git-dev-metrics config --test'));
-  console.log(chalk.gray('  3. Try: git-dev-metrics jira -p YOUR_PROJECT_KEY\n'));
+  console.log(chalk.gray('  2. Run: gdm config --test'));
+  console.log(chalk.gray('  3. Try: gdm jira -p YOUR_PROJECT_KEY\n'));
 }

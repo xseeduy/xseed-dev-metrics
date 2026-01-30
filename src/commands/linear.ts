@@ -168,7 +168,7 @@ export async function linearCommand(options: LinearCommandOptions): Promise<void
     console.log(chalk.yellow('\n⚠️  Linear is not configured.\n'));
     console.log('Set environment variable:');
     console.log(chalk.gray('  export LINEAR_API_KEY=lin_api_xxxxx\n'));
-    console.log('Or run: git-dev-metrics config --init\n');
+    console.log('Or run: gdm config --init\n');
     return;
   }
 

@@ -173,7 +173,7 @@ export async function jiraCommand(options: JiraCommandOptions): Promise<void> {
     console.log(chalk.gray('  export JIRA_URL=https://yourcompany.atlassian.net'));
     console.log(chalk.gray('  export JIRA_EMAIL=your@email.com'));
     console.log(chalk.gray('  export JIRA_TOKEN=your_api_token\n'));
-    console.log('Or run: git-dev-metrics config --init\n');
+    console.log('Or run: gdm config --init\n');
     return;
   }
 
