@@ -100,7 +100,7 @@ export NOTION_AUTO_UPLOAD="true"
 |---------|-------------|
 | `gdm init` | Interactive setup wizard (add/update client) |
 | `gdm init --force` | Add a new client (when already configured) |
-| `gdm collect` | Collect metrics from repositories (default: last 7 days) |
+| `gdm collect` | Collect metrics from repositories (CSV format, last 7 days) |
 | `gdm show` | View collected historical metrics |
 | `gdm status` | Show configuration status |
 | `gdm daemon start` | Enable automatic weekly collection |
@@ -191,17 +191,22 @@ Repository not configured: /path/to/repo
 
 Repositories can belong to multiple clients if needed (useful for shared libraries).
 
-**What `gdm collect` does:** pulls the latest from the repo, gathers Git metrics (commits, lines, activity, trends) for the configured user, optionally Jira metrics, and saves a snapshot to `~/.xseed-metrics/data/`. By default it collects **from 7 days ago until today** (last week). You can change the range:
+**What `gdm collect` does:** pulls the latest from the repo, gathers Git metrics (commits, lines, activity, trends) for the configured user, optionally Jira metrics, and saves a snapshot to `~/.xseed-metrics/data/`. By default it collects **from 7 days ago until today** (last week) and saves in **CSV format**. You can change the range and format:
 
 ```bash
-gdm collect                    # Last 7 days (default)
+gdm collect                    # Last 7 days, CSV format (default)
+gdm collect --format json      # Output as JSON instead of CSV
 gdm collect -t                 # All time (--total)
 gdm collect --since="30 days ago" # Last 30 days
 gdm collect --since=2024-01-01 # From a start date until today
 gdm collect -s 2024-01-01 -u 2024-12-31  # Custom range (--since / --until)
 ```
 
-**Collect per user (separate files):** use `--usernames` to collect metrics for specific authors or all authors. Each user gets a separate JSON file (e.g. `repo_John_Doe_2024-01-15.json`).
+**Output Formats:**
+- **CSV** (default): Structured format with columns: `metric_type`, `metric_name`, `value`, `unit`, `details`. Perfect for Excel, Google Sheets, or data analysis tools.
+- **JSON**: Full structured data, useful for programmatic access or Notion uploads.
+
+**Collect per user (separate files):** use `--usernames` to collect metrics for specific authors or all authors. Each user gets a separate file (e.g. `repo_John_Doe_2024-01-15.csv`).
 
 ```bash
 gdm collect --usernames="John Doe,Jane Doe"           # Specific users

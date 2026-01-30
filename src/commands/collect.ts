@@ -265,16 +265,131 @@ async function collectRepoMetrics(
 // Save Data
 // ==========================================
 
-function saveCollectedData(repoName: string, data: CollectedData, authorSlug?: string, clientName?: string): string {
+function convertToCSV(data: CollectedData): string {
+  const lines: string[] = [];
+  
+  // Header row
+  lines.push('metric_type,metric_name,value,unit,details');
+  
+  // Metadata
+  lines.push(`metadata,collected_at,${data.collectedAt},timestamp,`);
+  lines.push(`metadata,repository,${data.repoName},text,`);
+  lines.push(`metadata,user_name,${data.user.username},text,`);
+  lines.push(`metadata,user_email,${data.user.email},email,`);
+  lines.push(`metadata,period,${data.period?.label || 'N/A'},text,`);
+  
+  // Git Metrics - Summary
+  const summary = data.gitMetrics.summary as any;
+  if (summary) {
+    lines.push(`git_summary,total_commits,${summary.totalCommits || 0},count,`);
+    lines.push(`git_summary,total_authors,${summary.totalAuthors || 0},count,`);
+    lines.push(`git_summary,lines_added,${summary.totalLinesAdded || 0},count,`);
+    lines.push(`git_summary,lines_deleted,${summary.totalLinesDeleted || 0},count,`);
+    lines.push(`git_summary,net_lines,${(summary.totalLinesAdded || 0) - (summary.totalLinesDeleted || 0)},count,`);
+    lines.push(`git_summary,files_changed,${summary.totalFilesChanged || 0},count,`);
+    lines.push(`git_summary,active_branches,${summary.activeBranches || 0},count,`);
+    lines.push(`git_summary,current_branch,${summary.currentBranch || 'N/A'},text,`);
+    if (summary.firstCommitDate) {
+      lines.push(`git_summary,first_commit,${summary.firstCommitDate},date,`);
+    }
+    if (summary.lastCommitDate) {
+      lines.push(`git_summary,last_commit,${summary.lastCommitDate},date,`);
+    }
+  }
+  
+  // Git Metrics - User Stats
+  const userStats = data.gitMetrics.userStats as any;
+  if (userStats) {
+    lines.push(`git_user,commits,${userStats.commits || 0},count,`);
+    lines.push(`git_user,lines_added,${userStats.linesAdded || 0},count,`);
+    lines.push(`git_user,lines_deleted,${userStats.linesDeleted || 0},count,`);
+    lines.push(`git_user,lines_net,${userStats.linesNet || 0},count,`);
+    lines.push(`git_user,files_changed,${userStats.filesChanged || 0},count,`);
+    lines.push(`git_user,active_days,${userStats.activeDays || 0},count,`);
+    lines.push(`git_user,avg_commits_per_day,${userStats.avgCommitsPerDay || 0},rate,`);
+    if (userStats.firstCommit) {
+      lines.push(`git_user,first_commit,${userStats.firstCommit},date,`);
+    }
+    if (userStats.lastCommit) {
+      lines.push(`git_user,last_commit,${userStats.lastCommit},date,`);
+    }
+  }
+  
+  // Git Metrics - Activity by Day of Week
+  const activity = data.gitMetrics.activity as any;
+  if (activity?.byDayOfWeek) {
+    for (const [day, count] of Object.entries(activity.byDayOfWeek)) {
+      lines.push(`git_activity_day,${day},${count},count,`);
+    }
+  }
+  
+  // Git Metrics - Activity by Hour
+  if (activity?.byHour) {
+    for (const [hour, count] of Object.entries(activity.byHour)) {
+      lines.push(`git_activity_hour,hour_${hour},${count},count,`);
+    }
+  }
+  
+  // Git Metrics - Weekly Trends
+  const trends = data.gitMetrics.trends as any;
+  if (Array.isArray(trends)) {
+    trends.forEach((trend: any) => {
+      lines.push(`git_trend,${trend.period},${trend.commits || 0},commits,"lines_added:${trend.linesAdded || 0}|lines_deleted:${trend.linesDeleted || 0}|authors:${trend.authors || 0}"`);
+    });
+  }
+  
+  // Jira Metrics
+  if (data.jiraMetrics && typeof data.jiraMetrics === 'object') {
+    const jira = data.jiraMetrics as any;
+    if (jira.available !== false) {
+      lines.push(`jira,issues_analyzed,${jira.issuesAnalyzed || 0},count,`);
+      lines.push(`jira,issues_created,${jira.created || 0},count,`);
+      lines.push(`jira,issues_in_progress,${jira.inProgress || 0},count,`);
+      lines.push(`jira,issues_completed,${jira.completed || 0},count,`);
+      
+      if (jira.cycleTime) {
+        lines.push(`jira,cycle_time_avg_days,${jira.cycleTime.avgDays || 0},days,`);
+        lines.push(`jira,cycle_time_median_days,${jira.cycleTime.medianDays || 0},days,`);
+      }
+      
+      if (jira.leadTime) {
+        lines.push(`jira,lead_time_avg_days,${jira.leadTime.avgDays || 0},days,`);
+        lines.push(`jira,lead_time_median_days,${jira.leadTime.medianDays || 0},days,`);
+      }
+      
+      if (jira.velocity) {
+        lines.push(`jira,velocity_story_points,${jira.velocity.storyPoints || 0},points,`);
+        lines.push(`jira,velocity_issues_per_week,${jira.velocity.issuesPerWeek || 0},rate,`);
+      }
+    }
+  }
+  
+  return lines.join('\n');
+}
+
+function saveCollectedData(
+  repoName: string, 
+  data: CollectedData, 
+  authorSlug?: string, 
+  clientName?: string, 
+  outputFormat: 'json' | 'csv' = 'csv'
+): string {
   const dataDir = getDataDir(clientName);
   const dateStr = format(new Date(), 'yyyy-MM-dd');
+  const extension = outputFormat === 'json' ? 'json' : 'csv';
   const filename = authorSlug
-    ? `${repoName}_${authorSlug}_${dateStr}.json`
-    : `${repoName}_${dateStr}.json`;
+    ? `${repoName}_${authorSlug}_${dateStr}.${extension}`
+    : `${repoName}_${dateStr}.${extension}`;
   const filepath = join(dataDir, filename);
 
   data.fileName = filename;
-  writeFileSync(filepath, JSON.stringify(data, null, 2));
+  
+  if (outputFormat === 'json') {
+    writeFileSync(filepath, JSON.stringify(data, null, 2));
+  } else {
+    writeFileSync(filepath, convertToCSV(data));
+  }
+  
   return filepath;
 }
 
@@ -335,6 +450,7 @@ export async function collectCommand(options: {
   scheduled?: boolean;
   upload?: boolean;
   noUpload?: boolean;
+  format?: 'json' | 'csv';
 }): Promise<void> {
   if (!isInitialized()) {
     printError('Not configured. Run `gdm init` first.');
@@ -448,7 +564,13 @@ export async function collectCommand(options: {
         until: options.until || defaultUntil,
       };
 
-  const results: Array<{ repo: string; success: boolean; files?: string[]; error?: string }> = [];
+  const results: Array<{ 
+    repo: string; 
+    success: boolean; 
+    files?: string[]; 
+    uploadData?: Array<{ path: string; data: CollectedData }>; 
+    error?: string 
+  }> = [];
 
   for (const repoPath of repos) {
     if (!existsSync(repoPath)) {
@@ -493,6 +615,7 @@ export async function collectCommand(options: {
       }
 
       const filesSaved: string[] = [];
+      const collectedDataForUpload: Array<{ path: string; data: CollectedData }> = [];
 
       for (const username of usersToCollect) {
         if (!singleUser && !options.quiet) {
@@ -510,11 +633,20 @@ export async function collectCommand(options: {
         });
 
         const authorSlug = singleUser ? undefined : authorToSlug(username);
-        const filepath = saveCollectedData(repoName, data, authorSlug, clientName);
+        const outputFormat = options.format || 'csv';
+        const filepath = saveCollectedData(repoName, data, authorSlug, clientName, outputFormat);
         filesSaved.push(filepath);
+        
+        // Store data for potential Notion upload (always needs JSON format)
+        collectedDataForUpload.push({ path: filepath, data });
       }
 
-      results.push({ repo: repoName, success: true, files: filesSaved });
+      results.push({ 
+        repo: repoName, 
+        success: true, 
+        files: filesSaved,
+        uploadData: collectedDataForUpload 
+      });
 
       spinner.succeed(
         singleUser
@@ -633,19 +765,11 @@ export async function collectCommand(options: {
       isSilent: options.quiet,
     }).start();
 
-    // Prepare files with data
+    // Prepare files with data (use in-memory data since files might be CSV)
     const filesToUpload: Array<{ path: string; data: CollectedData }> = [];
     for (const result of successful) {
-      if (result.files) {
-        for (const filePath of result.files) {
-          try {
-            const fileContent = readFileSync(filePath, 'utf-8');
-            const data = JSON.parse(fileContent) as CollectedData;
-            filesToUpload.push({ path: filePath, data });
-          } catch (error: unknown) {
-            // Failed to read or parse file, skip it
-          }
-        }
+      if (result.uploadData) {
+        filesToUpload.push(...result.uploadData);
       }
     }
 
