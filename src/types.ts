@@ -135,8 +135,10 @@ export interface DateRange {
  * Extends DateRange with additional filter criteria.
  */
 export interface FilterOptions extends DateRange {
-  /** Filter by author name */
+  /** Filter by author name (prefer using email for more accurate matching) */
   author?: string;
+  /** Filter by author email (more reliable than author name) */
+  email?: string;
   /** List of authors to exclude */
   excludeAuthors?: string[];
   /** Filter by branch name */

@@ -89,7 +89,15 @@ export class GitMetrics {
     
     if (options.since) args.push(`--since="${options.since}"`);
     if (options.until) args.push(`--until="${options.until}"`);
-    if (options.author) args.push(`--author="${options.author}"`);
+    
+    // Prefer email for filtering (more reliable than author name)
+    // Git's --author flag matches against both name and email
+    if (options.email) {
+      args.push(`--author="${options.email}"`);
+    } else if (options.author) {
+      args.push(`--author="${options.author}"`);
+    }
+    
     if (!options.includeMerges) args.push('--no-merges');
     if (options.branch) args.push(options.branch);
     if (options.paths?.length) args.push('--', ...options.paths);
@@ -322,8 +330,9 @@ export class GitMetrics {
     const stats: AuthorStats[] = [];
 
     for (const [author, email] of authorEmails) {
-      const authorArgs = this.buildLogArgs({ ...options, author, includeMerges: false });
-      const authorArgsWithMerges = this.buildLogArgs({ ...options, author, includeMerges: true });
+      // Use email for filtering (more reliable than author name)
+      const authorArgs = this.buildLogArgs({ ...options, email, includeMerges: false });
+      const authorArgsWithMerges = this.buildLogArgs({ ...options, email, includeMerges: true });
 
       // Commit count (without merges)
       const commits = parseInt(
@@ -336,37 +345,37 @@ export class GitMetrics {
       );
       const mergeCommits = totalWithMerges - commits;
 
-      // Lines added/deleted (Windows-compatible: no awk)
+      // Lines added/deleted - use email for filtering
       const linesRaw = this.exec(
-        `git log --author="${author}" --pretty=tformat: --numstat ${authorArgs}`
+        `git log --author="${email}" --pretty=tformat: --numstat ${authorArgs}`
       );
       const { added: linesAdded, deleted: linesDeleted } = this.parseNumstat(linesRaw);
 
-      // Files changed (Windows-compatible: no sort, wc)
+      // Files changed - use email for filtering
       const filesRaw = this.exec(
-        `git log --author="${author}" --pretty=tformat: --name-only ${authorArgs}`
+        `git log --author="${email}" --pretty=tformat: --name-only ${authorArgs}`
       );
       const filesChanged = this.countUniqueLines(filesRaw);
 
-      // First and last commit dates (Windows-compatible: no head)
+      // First and last commit dates - use email for filtering
       let firstCommit: Date | null = null;
       let lastCommit: Date | null = null;
 
       try {
         const firstRaw = this.exec(
-          `git log --author="${author}" --reverse --format='%aI' ${authorArgs}`
+          `git log --author="${email}" --reverse --format='%aI' ${authorArgs}`
         );
         const first = firstRaw.split('\n')[0]; // First line instead of head -1
         const last = this.exec(
-          `git log --author="${author}" --format='%aI' -1 ${authorArgs}`
+          `git log --author="${email}" --format='%aI' -1 ${authorArgs}`
         );
         if (first) firstCommit = new Date(first);
         if (last) lastCommit = new Date(last);
       } catch {}
 
-      // Active days (Windows-compatible: no sort, wc)
+      // Active days - use email for filtering
       const daysRaw = this.exec(
-        `git log --author="${author}" --format='%ad' --date='format:%Y-%m-%d' ${authorArgs}`
+        `git log --author="${email}" --format='%ad' --date='format:%Y-%m-%d' ${authorArgs}`
       );
       const activeDays = this.countUniqueLines(daysRaw);
 

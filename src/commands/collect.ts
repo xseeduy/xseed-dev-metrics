@@ -223,12 +223,14 @@ async function collectRepoMetrics(
 
   // Get general summary (repo-wide, no author filter)
   const summary = metrics.getRepoSummary(filterOptions);
-  // Get user-specific stats
-  const userStats = metrics.getAuthorStats({ ...filterOptions, author });
-  // Get activity patterns
-  const activity = metrics.getTimeStats({ ...filterOptions, author });
-  // Get weekly trends
-  const trends = metrics.getStatsByPeriod({ ...filterOptions, author }, 'week');
+  // Get user-specific stats (filter by email for accuracy)
+  // getAuthorStats returns an array, so we take the first element (should only be one when filtering by email)
+  const userStatsArray = metrics.getAuthorStats({ ...filterOptions, email: userEmail });
+  const userStats = userStatsArray.length > 0 ? userStatsArray[0] : null;
+  // Get activity patterns (filter by email for accuracy)
+  const activity = metrics.getTimeStats({ ...filterOptions, email: userEmail });
+  // Get weekly trends (filter by email for accuracy)
+  const trends = metrics.getStatsByPeriod({ ...filterOptions, email: userEmail }, 'week');
 
   const data: CollectedData = {
     collectedAt: now.toISOString(),
