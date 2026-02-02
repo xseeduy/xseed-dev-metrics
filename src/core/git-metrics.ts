@@ -253,7 +253,8 @@ export class GitMetrics {
     );
 
     // Get unique authors (Windows-compatible)
-    const authorsRaw = this.exec(`git log --format='%aN' ${logArgs}`);
+    // Use --use-mailmap to respect .mailmap file for consolidating author identities
+    const authorsRaw = this.exec(`git log --use-mailmap --format='%aN' ${logArgs}`);
     const totalAuthors = this.countUniqueLines(authorsRaw);
 
     // Lines added/deleted (Windows-compatible: no awk)
@@ -319,7 +320,8 @@ export class GitMetrics {
     const logArgs = this.buildLogArgs({ ...options, includeMerges: true });
     
     // Get all authors (Windows-compatible: no sort -u)
-    const authorsRaw = this.exec(`git log --format='%aN|%aE' ${logArgs}`);
+    // Use --use-mailmap to respect .mailmap file for consolidating author identities
+    const authorsRaw = this.exec(`git log --use-mailmap --format='%aN|%aE' ${logArgs}`);
     const authorEmails = new Map<string, string>();
     
     authorsRaw.split('\n').filter(Boolean).forEach(line => {
@@ -426,7 +428,8 @@ export class GitMetrics {
     // Format: hash|shortHash|author|email|date|message|isMerge
     const format = '%H|%h|%aN|%aE|%aI|%s|%P';
     
-    const raw = this.exec(`git log --format='${format}' ${limitArg} ${logArgs}`);
+    // Use --use-mailmap to respect .mailmap file for consolidating author identities
+    const raw = this.exec(`git log --use-mailmap --format='${format}' ${limitArg} ${logArgs}`);
     const commits: CommitInfo[] = [];
 
     for (const line of raw.split('\n').filter(Boolean)) {
@@ -494,8 +497,9 @@ export class GitMetrics {
     const byHour: Record<number, number> = {};
     for (let i = 0; i < 24; i++) byHour[i] = 0;
 
+    // Use --use-mailmap to respect .mailmap file for consolidating author identities
     const hourRaw = this.exec(
-      `git log --format='%ad' --date='format:%H' ${logArgs}`
+      `git log --use-mailmap --format='%ad' --date='format:%H' ${logArgs}`
     );
     hourRaw.split('\n').filter(Boolean).forEach(h => {
       const hour = parseInt(h);
@@ -509,7 +513,7 @@ export class GitMetrics {
     };
 
     const dayRaw = this.exec(
-      `git log --format='%ad' --date='format:%A' ${logArgs}`
+      `git log --use-mailmap --format='%ad' --date='format:%A' ${logArgs}`
     );
     dayRaw.split('\n').filter(Boolean).forEach(d => {
       byDayOfWeek[d] = (byDayOfWeek[d] || 0) + 1;
@@ -518,7 +522,7 @@ export class GitMetrics {
     // By month (YYYY-MM)
     const byMonth: Record<string, number> = {};
     const monthRaw = this.exec(
-      `git log --format='%ad' --date='format:%Y-%m' ${logArgs}`
+      `git log --use-mailmap --format='%ad' --date='format:%Y-%m' ${logArgs}`
     );
     monthRaw.split('\n').filter(Boolean).forEach(m => {
       byMonth[m] = (byMonth[m] || 0) + 1;
@@ -527,7 +531,7 @@ export class GitMetrics {
     // By week (YYYY-WW)
     const byWeek: Record<string, number> = {};
     const weekRaw = this.exec(
-      `git log --format='%ad' --date='format:%Y-%V' ${logArgs}`
+      `git log --use-mailmap --format='%ad' --date='format:%Y-%V' ${logArgs}`
     );
     weekRaw.split('\n').filter(Boolean).forEach(w => {
       byWeek[w] = (byWeek[w] || 0) + 1;
@@ -578,7 +582,8 @@ export class GitMetrics {
       } catch {}
 
       // Get authors who touched this file (Windows-compatible: no sort -u)
-      const authorsRaw = this.exec(`git log --format='%aN' ${logArgs} -- "${path}"`);
+      // Use --use-mailmap to respect .mailmap file for consolidating author identities
+      const authorsRaw = this.exec(`git log --use-mailmap --format='%aN' ${logArgs} -- "${path}"`);
       const authors = this.getUniqueValues(authorsRaw.split('\n'));
 
       stats.push({
@@ -690,8 +695,9 @@ export class GitMetrics {
     }
 
     // Get commits with stats grouped by period
+    // Use --use-mailmap to respect .mailmap file for consolidating author identities
     const raw = this.exec(`
-      git log --format='%ad|%aN' --date='format:${dateFormat}' --numstat ${logArgs}
+      git log --use-mailmap --format='%ad|%aN' --date='format:${dateFormat}' --numstat ${logArgs}
     `);
 
     const periodMap = new Map<string, {

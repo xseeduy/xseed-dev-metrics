@@ -118,7 +118,8 @@ function authorToSlug(name: string): string {
 function getEmailForAuthor(repoPath: string, authorName: string): string {
   try {
     const escaped = authorName.replace(/"/g, '\\"');
-    const email = execSync(`git log -1 --format=%ae --author="${escaped}"`, {
+    // Use --use-mailmap to respect .mailmap file for consolidating author identities
+    const email = execSync(`git log --use-mailmap -1 --format=%ae --author="${escaped}"`, {
       cwd: repoPath,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -140,7 +141,8 @@ function getAuthorsInRepo(
     if (filterOptions.until) args.push(`--until="${filterOptions.until}"`);
     const logArgs = args.join(' ');
     // Windows-compatible: no sort -u, use JavaScript Set for uniqueness
-    const raw = execSync(`git log --format='%aN' ${logArgs}`, {
+    // Use --use-mailmap to respect .mailmap file for consolidating author identities
+    const raw = execSync(`git log --use-mailmap --format='%aN' ${logArgs}`, {
       cwd: repoPath,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -407,12 +409,21 @@ export function loadHistoricalData(repoName: string, limit: number = 10, clientN
     const entries = readdirSync(dataDir);
     
     for (const entry of entries) {
-      if (entry.startsWith(repoName) && entry.endsWith('.json')) {
+      // Support both JSON and CSV files
+      if (entry.startsWith(repoName) && (entry.endsWith('.json') || entry.endsWith('.csv'))) {
         try {
-          const content = readFileSync(join(dataDir, entry), 'utf-8');
-          files.push(JSON.parse(content));
+          if (entry.endsWith('.json')) {
+            // Load JSON files directly
+            const content = readFileSync(join(dataDir, entry), 'utf-8');
+            files.push(JSON.parse(content));
+          } else if (entry.endsWith('.csv')) {
+            // Parse CSV files back to CollectedData format
+            const content = readFileSync(join(dataDir, entry), 'utf-8');
+            const parsed = parseCSVToCollectedData(content);
+            if (parsed) files.push(parsed);
+          }
         } catch (error: unknown) {
-          // Failed to parse JSON file, skip it
+          // Failed to parse file, skip it
         }
       }
     }
@@ -423,6 +434,65 @@ export function loadHistoricalData(repoName: string, limit: number = 10, clientN
   return files
     .sort((a, b) => new Date(b.collectedAt).getTime() - new Date(a.collectedAt).getTime())
     .slice(0, limit);
+}
+
+/**
+ * Parse CSV content back to CollectedData format for display
+ */
+function parseCSVToCollectedData(csvContent: string): CollectedData | null {
+  try {
+    const lines = csvContent.split('\n');
+    const data: any = {
+      collectedAt: '',
+      repository: '',
+      repoName: '',
+      user: { username: '', email: '' },
+      gitMetrics: {
+        summary: {},
+        userStats: {},
+        activity: { byDayOfWeek: {}, byHour: {}, byMonth: {} },
+        trends: []
+      }
+    };
+    
+    // Parse CSV line by line
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      
+      const parts = line.split(',');
+      if (parts.length < 3) continue;
+      
+      const [metricType, metricName, value] = parts;
+      
+      // Metadata
+      if (metricType === 'metadata') {
+        if (metricName === 'collected_at') data.collectedAt = value;
+        else if (metricName === 'repository') data.repoName = value;
+        else if (metricName === 'user_name') data.user.username = value;
+        else if (metricName === 'user_email') data.user.email = value;
+        else if (metricName === 'period') {
+          data.period = { since: null, until: null, label: value };
+        }
+      }
+      // Git Summary
+      else if (metricType === 'git_summary') {
+        if (metricName === 'total_commits') data.gitMetrics.summary.totalCommits = parseInt(value) || 0;
+        else if (metricName === 'lines_added') data.gitMetrics.summary.totalLinesAdded = parseInt(value) || 0;
+        else if (metricName === 'lines_deleted') data.gitMetrics.summary.totalLinesDeleted = parseInt(value) || 0;
+      }
+      // Git User
+      else if (metricType === 'git_user') {
+        if (metricName === 'commits') data.gitMetrics.userStats.commits = parseInt(value) || 0;
+        else if (metricName === 'lines_added') data.gitMetrics.userStats.linesAdded = parseInt(value) || 0;
+        else if (metricName === 'lines_deleted') data.gitMetrics.userStats.linesDeleted = parseInt(value) || 0;
+      }
+    }
+    
+    return data as CollectedData;
+  } catch (error) {
+    return null;
+  }
 }
 
 // ==========================================

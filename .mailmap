@@ -1,0 +1,8 @@
+# Git Mailmap - Unifies multiple email addresses for the same author
+# Format: Canonical Name <canonical@email.com> Commit Name <commit@email.com>
+#
+# This file maps different email addresses to a single canonical identity.
+# Git will automatically use this when running commands like 'git shortlog' with -e flag.
+
+# Adrian's emails
+Adrian <ahalaburda@xseed.com.uy> Adrian <adh761@gmail.com>

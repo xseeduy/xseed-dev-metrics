@@ -329,6 +329,38 @@ Configuration is stored in `~/.xseed-metrics/config.json`:
 | `NOTION_CLIENT_NAME` | Client/organization name (optional) |
 | `NOTION_AUTO_UPLOAD` | Auto-upload on scheduled runs (true/false) |
 
+### Git Mailmap Support
+
+Xseed Metrics automatically respects Git's `.mailmap` file to consolidate multiple email addresses into a single identity. This is useful when developers use different emails across commits.
+
+**Example `.mailmap` file:**
+
+```
+# Consolidate personal and work emails
+Adrian <ahalaburda@xseed.com.uy> Adrian <adh761@gmail.com>
+John Doe <john@company.com> Jon Doe <john@company.com>
+```
+
+**Benefits:**
+- ✅ Unified author statistics across all email addresses
+- ✅ Accurate commit counts and line metrics
+- ✅ Automatic consolidation in all reports
+- ✅ Standard Git feature (works with all Git tools)
+
+**Quick setup:**
+
+```bash
+# Create .mailmap in your repository root
+cat > .mailmap << 'EOF'
+Canonical Name <canonical@email.com> Commit Name <commit@email.com>
+EOF
+
+# Verify it works
+git log --use-mailmap --format='%aN <%aE>' | sort -u
+```
+
+📖 **[Full Mailmap Guide](docs/mailmap-guide.md)** - Learn more about configuring and using mailmap
+
 ## 📈 Metrics Collected
 
 ### Git Metrics
