@@ -327,7 +327,6 @@ export async function cleanCommand(options: {
   all?: boolean;
   yes?: boolean;
 } = {}): Promise<void> {
-  printCompactHeader();
   printSection('Cleaning Configuration & Data');
 
   // Determine what to clean

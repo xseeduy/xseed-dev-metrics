@@ -21,7 +21,6 @@ import { printCompactHeader, printSuccess, printError, printWarning, printSectio
  * Lists all configured clients and shows which is active.
  */
 export async function listClientsCommand(): Promise<void> {
-  printCompactHeader();
   printSection('Configured Clients');
 
   const status = getConfigStatus();
@@ -70,8 +69,6 @@ export async function listClientsCommand(): Promise<void> {
  * @param clientName - Name of the client to switch to
  */
 export async function switchClientCommand(clientName: string): Promise<void> {
-  printCompactHeader();
-
   if (!clientName) {
     printError('Client name is required.');
     console.log(chalk.gray(`\n  Usage: ${chalk.cyan('gdm client:switch <name>')}\n`));
@@ -120,8 +117,6 @@ export async function switchClientCommand(clientName: string): Promise<void> {
  * @param options.force - Skip confirmation prompt
  */
 export async function removeClientCommand(clientName: string, options: { force?: boolean } = {}): Promise<void> {
-  printCompactHeader();
-
   if (!clientName) {
     printError('Client name is required.');
     console.log(chalk.gray(`\n  Usage: ${chalk.cyan('gdm client:remove <name>')}\n`));

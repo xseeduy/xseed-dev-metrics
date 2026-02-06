@@ -219,8 +219,6 @@ export async function daemonCommand(action: string): Promise<void> {
     return;
   }
 
-  printCompactHeader();
-
   const config = getConfig();
 
   if (!config) {

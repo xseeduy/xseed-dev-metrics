@@ -539,6 +539,18 @@ export async function collectCommand(options: {
   noUpload?: boolean;
   format?: 'json' | 'csv';
 }): Promise<void> {
+  // Detect common mistake: using -authors instead of --usernames
+  const args = process.argv.slice(2);
+  const authorsFlag = args.find(arg => arg.startsWith('-authors') || arg.startsWith('--authors'));
+  if (authorsFlag) {
+    printError(`Invalid parameter: '${authorsFlag}'`);
+    console.log(chalk.yellow(`  Did you mean: ${chalk.cyan('--usernames')}?\n`));
+    console.log(chalk.gray('  Examples:'));
+    console.log(chalk.gray(`    gdm collect --usernames=user1,user2`));
+    console.log(chalk.gray(`    gdm collect --usernames=ALL\n`));
+    return;
+  }
+
   if (!isInitialized()) {
     printError('Not configured. Run `gdm init` first.');
     return;
@@ -581,7 +593,6 @@ export async function collectCommand(options: {
   const usernamesOption = parseUsernamesOption(options.usernames);
 
   if (!options.quiet) {
-    printCompactHeader();
     console.log(chalk.gray('  Collecting developer metrics...\n'));
   }
 
@@ -678,7 +689,30 @@ export async function collectCommand(options: {
         continue;
       }
     } else {
-      usersToCollect = usernamesOption.names;
+      // Validate that requested users exist in the repository
+      const allAuthorsInRepo = getAuthorsInRepo(repoPath, filterOptions);
+      usersToCollect = [];
+      const missingUsers: string[] = [];
+      
+      for (const requestedUser of usernamesOption.names) {
+        if (allAuthorsInRepo.includes(requestedUser)) {
+          usersToCollect.push(requestedUser);
+        } else {
+          missingUsers.push(requestedUser);
+        }
+      }
+      
+      // Report missing users
+      if (missingUsers.length > 0 && !options.quiet) {
+        for (const user of missingUsers) {
+          printError(`User '${user}' not found in ${repoName} (available: ${allAuthorsInRepo.join(', ')})`);
+        }
+      }
+      
+      // If no valid users remain, skip this repo
+      if (usersToCollect.length === 0) {
+        continue;
+      }
     }
 
     const singleUser = usersToCollect.length === 1 && usersToCollect[0] === gitConfig.username && usernamesOption.type === 'none';
