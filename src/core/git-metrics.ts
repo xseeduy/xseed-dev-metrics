@@ -99,10 +99,131 @@ export class GitMetrics {
     }
     
     if (!options.includeMerges) args.push('--no-merges');
-    if (options.branch) args.push(options.branch);
+    
+    // Handle branch filtering - support both single and multiple branches
+    if (options.branches?.length) {
+      // Multiple branches - use --all with branch restriction
+      args.push('--all');
+    } else if (options.branch) {
+      // Single branch (legacy)
+      args.push(options.branch);
+    }
+    
     if (options.paths?.length) args.push('--', ...options.paths);
     
     return args.join(' ');
+  }
+
+  // ==========================================
+  // Branch Operations
+  // ==========================================
+
+  /**
+   * Gets all branches that haven't been merged to the main branch.
+   * These branches contain work that is not yet in the main branch.
+   * 
+   * @param mainBranch - The main branch to compare against (default: 'main')
+   * @returns Array of unmerged branch names (e.g., ['origin/develop', 'origin/feature-auth'])
+   * @example
+   * ```typescript
+   * const unmerged = metrics.getUnmergedBranches('main');
+   * console.log(`Found ${unmerged.length} unmerged branches`);
+   * ```
+   */
+  getUnmergedBranches(mainBranch: string = 'main'): string[] {
+    try {
+      // Get all remote branches that are not merged to main
+      const raw = this.exec(`git branch -r --no-merged ${mainBranch}`);
+      
+      if (!raw) return [];
+      
+      const branches = raw
+        .split('\n')
+        .map(b => b.trim())
+        .filter(b => {
+          // Filter out empty lines, HEAD, and main/master branches
+          if (!b) return false;
+          if (b.includes('HEAD')) return false;
+          if (b === `origin/${mainBranch}`) return false;
+          if (b === 'origin/main' || b === 'origin/master') return false;
+          return true;
+        });
+      
+      return branches;
+    } catch (error: unknown) {
+      // If the command fails (e.g., no remote branches), return empty array
+      return [];
+    }
+  }
+
+  /**
+   * Gets all active branches including the main branch and unmerged branches.
+   * This provides a complete list of branches to analyze for metrics.
+   * 
+   * @param mainBranch - The main branch name (default: 'main')
+   * @returns Array of all active branch names
+   * @example
+   * ```typescript
+   * const allBranches = metrics.getAllActiveBranches('main');
+   * // Returns: ['main', 'origin/develop', 'origin/feature-auth', ...]
+   * ```
+   */
+  getAllActiveBranches(mainBranch: string = 'main'): string[] {
+    const unmerged = this.getUnmergedBranches(mainBranch);
+    return [mainBranch, ...unmerged];
+  }
+
+  /**
+   * Collects commits from multiple branches and deduplicates them by commit hash.
+   * This ensures each commit is only counted once, even if it appears in multiple branches.
+   * 
+   * @param branches - Array of branch names to collect from
+   * @param options - Filter options to narrow down the commits
+   * @param limit - Maximum number of commits to return (optional)
+   * @returns Array of unique commit information objects
+   * @example
+   * ```typescript
+   * const branches = ['main', 'origin/develop', 'origin/feature-auth'];
+   * const commits = metrics.getCommitsFromMultipleBranches(branches, { since: '2024-01-01' });
+   * console.log(`Found ${commits.length} unique commits across ${branches.length} branches`);
+   * ```
+   */
+  getCommitsFromMultipleBranches(
+    branches: string[],
+    options: FilterOptions = {},
+    limit?: number
+  ): CommitInfo[] {
+    if (!branches || branches.length === 0) {
+      return this.getCommits(options, limit);
+    }
+
+    // Use a Map to deduplicate commits by hash
+    const commitMap = new Map<string, CommitInfo>();
+
+    // Collect commits from each branch
+    for (const branch of branches) {
+      try {
+        const branchOptions = { ...options, branch, branches: undefined };
+        const branchCommits = this.getCommits(branchOptions, limit);
+        
+        // Add commits to the map (hash is unique identifier)
+        for (const commit of branchCommits) {
+          if (!commitMap.has(commit.hash)) {
+            commitMap.set(commit.hash, commit);
+          }
+        }
+      } catch (error: unknown) {
+        // If a branch fails, continue with others
+        continue;
+      }
+    }
+
+    // Convert map to array and sort by date (most recent first)
+    const uniqueCommits = Array.from(commitMap.values());
+    uniqueCommits.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    // Apply limit if specified
+    return limit ? uniqueCommits.slice(0, limit) : uniqueCommits;
   }
 
   // ==========================================
@@ -246,6 +367,11 @@ export class GitMetrics {
    * ```
    */
   getRepoSummary(options: FilterOptions = {}): RepoSummary {
+    // If multiple branches specified, use multi-branch collection
+    if (options.branches && options.branches.length > 0) {
+      return this.getRepoSummaryFromMultipleBranches(options);
+    }
+
     const logArgs = this.buildLogArgs(options);
     
     const totalCommits = parseInt(
@@ -298,6 +424,77 @@ export class GitMetrics {
     };
   }
 
+  /**
+   * Gets repository summary by collecting and deduplicating commits from multiple branches.
+   * This ensures accurate metrics when analyzing work across multiple active branches.
+   * 
+   * @param options - Filter options including branches array
+   * @returns Repository summary with branch metadata
+   * @private
+   */
+  private getRepoSummaryFromMultipleBranches(options: FilterOptions): RepoSummary {
+    const branches = options.branches || [];
+    
+    // Get unique commits across all branches
+    const commits = this.getCommitsFromMultipleBranches(branches, options);
+    
+    // Calculate totals from unique commits
+    const totalCommits = commits.length;
+    
+    // Get unique authors
+    const uniqueAuthors = new Set(commits.map(c => c.author));
+    const totalAuthors = uniqueAuthors.size;
+    
+    // Sum lines from unique commits
+    let totalLinesAdded = 0;
+    let totalLinesDeleted = 0;
+    for (const commit of commits) {
+      totalLinesAdded += commit.linesAdded;
+      totalLinesDeleted += commit.linesDeleted;
+    }
+    
+    // Get unique files
+    const uniqueFiles = new Set<string>();
+    for (const branch of branches) {
+      try {
+        const branchOptions = { ...options, branch, branches: undefined };
+        const filesRaw = this.exec(`git log --pretty=tformat: --name-only ${this.buildLogArgs(branchOptions)}`);
+        filesRaw.split('\n').filter(Boolean).forEach(file => uniqueFiles.add(file));
+      } catch {
+        continue;
+      }
+    }
+    const totalFilesChanged = uniqueFiles.size;
+    
+    // Get first and last commit dates
+    let firstCommitDate: Date | null = null;
+    let lastCommitDate: Date | null = null;
+    
+    if (commits.length > 0) {
+      const sortedByDate = [...commits].sort((a, b) => a.date.getTime() - b.date.getTime());
+      firstCommitDate = sortedByDate[0].date;
+      lastCommitDate = sortedByDate[sortedByDate.length - 1].date;
+    }
+    
+    // Get branch info
+    const branchesRaw = this.exec('git branch -a');
+    const activeBranches = branchesRaw.split('\n').filter(Boolean).length;
+    const currentBranch = this.exec('git branch --show-current') || 'HEAD';
+    
+    return {
+      totalCommits,
+      totalAuthors,
+      totalLinesAdded,
+      totalLinesDeleted,
+      totalFilesChanged,
+      firstCommitDate,
+      lastCommitDate,
+      activeBranches,
+      currentBranch,
+      branchesAnalyzed: branches,
+    };
+  }
+
   // ==========================================
   // Author Statistics
   // ==========================================
@@ -317,6 +514,11 @@ export class GitMetrics {
    * ```
    */
   getAuthorStats(options: FilterOptions = {}): AuthorStats[] {
+    // If multiple branches specified, use multi-branch collection
+    if (options.branches && options.branches.length > 0) {
+      return this.getAuthorStatsFromMultipleBranches(options);
+    }
+
     const logArgs = this.buildLogArgs({ ...options, includeMerges: true });
     
     // Get all authors (Windows-compatible: no sort -u)
@@ -401,6 +603,126 @@ export class GitMetrics {
       });
     }
 
+    // Sort by commits descending
+    return stats.sort((a, b) => b.commits - a.commits);
+  }
+
+  /**
+   * Gets author statistics by collecting and deduplicating commits from multiple branches.
+   * This ensures accurate per-author metrics when analyzing work across multiple active branches.
+   * 
+   * @param options - Filter options including branches array
+   * @returns Array of author statistics sorted by commit count (descending)
+   * @private
+   */
+  private getAuthorStatsFromMultipleBranches(options: FilterOptions): AuthorStats[] {
+    const branches = options.branches || [];
+    
+    // Get unique commits across all branches (including merge commits for accurate counting)
+    const allCommits = this.getCommitsFromMultipleBranches(branches, { ...options, includeMerges: true });
+    const nonMergeCommits = this.getCommitsFromMultipleBranches(branches, { ...options, includeMerges: false });
+    
+    // Group commits by author email (more reliable than name)
+    const authorMap = new Map<string, {
+      name: string;
+      email: string;
+      commits: CommitInfo[];
+      mergeCommits: CommitInfo[];
+    }>();
+    
+    // Add all commits to author map
+    for (const commit of allCommits) {
+      const key = commit.email;
+      if (!authorMap.has(key)) {
+        authorMap.set(key, {
+          name: commit.author,
+          email: commit.email,
+          commits: [],
+          mergeCommits: [],
+        });
+      }
+      
+      const authorData = authorMap.get(key)!;
+      if (commit.isMerge) {
+        authorData.mergeCommits.push(commit);
+      }
+    }
+    
+    // Add non-merge commits
+    for (const commit of nonMergeCommits) {
+      const key = commit.email;
+      const authorData = authorMap.get(key);
+      if (authorData) {
+        authorData.commits.push(commit);
+      }
+    }
+    
+    // Calculate stats for each author
+    const stats: AuthorStats[] = [];
+    
+    for (const [email, data] of authorMap) {
+      const commits = data.commits.length;
+      const mergeCommits = data.mergeCommits.length;
+      
+      // Calculate lines and files from non-merge commits
+      let linesAdded = 0;
+      let linesDeleted = 0;
+      const uniqueFiles = new Set<string>();
+      const uniqueDates = new Set<string>();
+      
+      for (const commit of data.commits) {
+        linesAdded += commit.linesAdded;
+        linesDeleted += commit.linesDeleted;
+        
+        // Track unique dates for active days
+        const dateStr = commit.date.toISOString().split('T')[0];
+        uniqueDates.add(dateStr);
+      }
+      
+      // Get unique files for this author across all branches
+      for (const branch of branches) {
+        try {
+          const branchOptions = { ...options, branch, branches: undefined, email };
+          const filesRaw = this.exec(`git log --author="${email}" --pretty=tformat: --name-only ${this.buildLogArgs(branchOptions)}`);
+          filesRaw.split('\n').filter(Boolean).forEach(file => uniqueFiles.add(file));
+        } catch {
+          continue;
+        }
+      }
+      
+      const filesChanged = uniqueFiles.size;
+      const activeDays = uniqueDates.size;
+      
+      // Get first and last commit dates
+      let firstCommit: Date | null = null;
+      let lastCommit: Date | null = null;
+      
+      if (data.commits.length > 0) {
+        const sortedByDate = [...data.commits].sort((a, b) => a.date.getTime() - b.date.getTime());
+        firstCommit = sortedByDate[0].date;
+        lastCommit = sortedByDate[sortedByDate.length - 1].date;
+      }
+      
+      const avgCommitsPerDay = activeDays > 0 ? commits / activeDays : 0;
+      const username = email.includes('@') ? email.split('@')[0] : email || data.name;
+      
+      stats.push({
+        name: data.name,
+        username,
+        email,
+        commits,
+        linesAdded,
+        linesDeleted,
+        linesNet: linesAdded - linesDeleted,
+        filesChanged,
+        firstCommit,
+        lastCommit,
+        activeDays,
+        avgCommitsPerDay: Math.round(avgCommitsPerDay * 100) / 100,
+        mergeCommits,
+      });
+    }
+    
     // Sort by commits descending
     return stats.sort((a, b) => b.commits - a.commits);
   }
@@ -491,6 +813,11 @@ export class GitMetrics {
    * ```
    */
   getTimeStats(options: FilterOptions = {}): TimeStats {
+    // If multiple branches specified, use multi-branch collection
+    if (options.branches && options.branches.length > 0) {
+      return this.getTimeStatsFromMultipleBranches(options);
+    }
+
     const logArgs = this.buildLogArgs(options);
 
     // By hour (0-23)
@@ -537,6 +864,56 @@ export class GitMetrics {
       byWeek[w] = (byWeek[w] || 0) + 1;
     });
 
+    return { byHour, byDayOfWeek, byMonth, byWeek };
+  }
+
+  /**
+   * Gets time statistics by collecting and deduplicating commits from multiple branches.
+   * 
+   * @param options - Filter options including branches array
+   * @returns Time-based statistics
+   * @private
+   */
+  private getTimeStatsFromMultipleBranches(options: FilterOptions): TimeStats {
+    const branches = options.branches || [];
+    
+    // Get unique commits across all branches
+    const commits = this.getCommitsFromMultipleBranches(branches, options);
+    
+    // Initialize counters
+    const byHour: Record<number, number> = {};
+    for (let i = 0; i < 24; i++) byHour[i] = 0;
+    
+    const byDayOfWeek: Record<string, number> = {
+      'Monday': 0, 'Tuesday': 0, 'Wednesday': 0, 'Thursday': 0,
+      'Friday': 0, 'Saturday': 0, 'Sunday': 0
+    };
+    
+    const byMonth: Record<string, number> = {};
+    const byWeek: Record<string, number> = {};
+    
+    // Count commits by time dimensions
+    for (const commit of commits) {
+      const date = commit.date;
+      
+      // By hour
+      const hour = date.getHours();
+      byHour[hour] = (byHour[hour] || 0) + 1;
+      
+      // By day of week
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayName = days[date.getDay()];
+      byDayOfWeek[dayName] = (byDayOfWeek[dayName] || 0) + 1;
+      
+      // By month (YYYY-MM)
+      const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      byMonth[month] = (byMonth[month] || 0) + 1;
+      
+      // By week (approximate - YYYY-WW)
+      const week = getWeekKey(date);
+      byWeek[week] = (byWeek[week] || 0) + 1;
+    }
+    
     return { byHour, byDayOfWeek, byMonth, byWeek };
   }
 
@@ -684,6 +1061,11 @@ export class GitMetrics {
    * ```
    */
   getStatsByPeriod(options: FilterOptions = {}, groupBy: GroupBy = 'month'): PeriodStats[] {
+    // If multiple branches specified, use multi-branch collection
+    if (options.branches && options.branches.length > 0) {
+      return this.getStatsByPeriodFromMultipleBranches(options, groupBy);
+    }
+
     const logArgs = this.buildLogArgs(options);
     
     let dateFormat: string;
@@ -751,6 +1133,79 @@ export class GitMetrics {
       });
     }
 
+    return stats.sort((a, b) => a.period.localeCompare(b.period));
+  }
+
+  /**
+   * Gets period statistics by collecting and deduplicating commits from multiple branches.
+   * 
+   * @param options - Filter options including branches array
+   * @param groupBy - Time period to group by
+   * @returns Array of period statistics sorted chronologically
+   * @private
+   */
+  private getStatsByPeriodFromMultipleBranches(options: FilterOptions, groupBy: GroupBy): PeriodStats[] {
+    const branches = options.branches || [];
+    
+    // Get unique commits across all branches
+    const commits = this.getCommitsFromMultipleBranches(branches, options);
+    
+    // Group commits by period
+    const periodMap = new Map<string, {
+      commits: Set<string>;
+      authors: Set<string>;
+      linesAdded: number;
+      linesDeleted: number;
+    }>();
+    
+    for (const commit of commits) {
+      // Determine period key based on groupBy
+      let period: string;
+      const date = commit.date;
+      
+      switch (groupBy) {
+        case 'day':
+          period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+          break;
+        case 'week':
+          period = getWeekKey(date);
+          break;
+        case 'month':
+          period = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          break;
+        case 'year':
+          period = `${date.getFullYear()}`;
+          break;
+      }
+      
+      if (!periodMap.has(period)) {
+        periodMap.set(period, {
+          commits: new Set(),
+          authors: new Set(),
+          linesAdded: 0,
+          linesDeleted: 0,
+        });
+      }
+      
+      const data = periodMap.get(period)!;
+      data.commits.add(commit.hash);
+      data.authors.add(commit.author);
+      data.linesAdded += commit.linesAdded;
+      data.linesDeleted += commit.linesDeleted;
+    }
+    
+    // Convert to array
+    const stats: PeriodStats[] = [];
+    for (const [period, data] of periodMap) {
+      stats.push({
+        period,
+        commits: data.commits.size,
+        linesAdded: data.linesAdded,
+        linesDeleted: data.linesDeleted,
+        authors: data.authors.size,
+      });
+    }
+    
     return stats.sort((a, b) => a.period.localeCompare(b.period));
   }
 

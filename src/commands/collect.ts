@@ -223,16 +223,24 @@ async function collectRepoMetrics(
     ? getEmailForAuthor(repoPath, options.authorOverride)
     : gitConfig.email;
 
-  // Get general summary (repo-wide, no author filter)
-  const summary = metrics.getRepoSummary(filterOptions);
-  // Get user-specific stats (filter by email for accuracy)
+  // Discover all active branches (main + unmerged branches)
+  const mainBranch = gitConfig.mainBranch;
+  const unmergedBranches = metrics.getUnmergedBranches(mainBranch);
+  const allBranches = [mainBranch, ...unmergedBranches];
+  
+  // Add branches to filter options for multi-branch collection
+  const multiBranchOptions = { ...filterOptions, branches: allBranches };
+
+  // Get general summary (repo-wide, no author filter) - from all branches
+  const summary = metrics.getRepoSummary(multiBranchOptions);
+  // Get user-specific stats (filter by email for accuracy) - from all branches
   // getAuthorStats returns an array, so we take the first element (should only be one when filtering by email)
-  const userStatsArray = metrics.getAuthorStats({ ...filterOptions, email: userEmail });
+  const userStatsArray = metrics.getAuthorStats({ ...multiBranchOptions, email: userEmail });
   const userStats = userStatsArray.length > 0 ? userStatsArray[0] : null;
-  // Get activity patterns (filter by email for accuracy)
-  const activity = metrics.getTimeStats({ ...filterOptions, email: userEmail });
-  // Get weekly trends (filter by email for accuracy)
-  const trends = metrics.getStatsByPeriod({ ...filterOptions, email: userEmail }, 'week');
+  // Get activity patterns (filter by email for accuracy) - from all branches
+  const activity = metrics.getTimeStats({ ...multiBranchOptions, email: userEmail });
+  // Get weekly trends (filter by email for accuracy) - from all branches
+  const trends = metrics.getStatsByPeriod({ ...multiBranchOptions, email: userEmail }, 'week');
 
   const data: CollectedData = {
     collectedAt: now.toISOString(),
@@ -293,6 +301,13 @@ function convertToCSV(data: CollectedData): string {
     lines.push(`git_summary,files_changed,${summary.totalFilesChanged || 0},count,`);
     lines.push(`git_summary,active_branches,${summary.activeBranches || 0},count,`);
     lines.push(`git_summary,current_branch,${summary.currentBranch || 'N/A'},text,`);
+    
+    // Branch metadata (for multi-branch collection)
+    if (summary.branchesAnalyzed && Array.isArray(summary.branchesAnalyzed)) {
+      lines.push(`git_summary,branches_analyzed,${summary.branchesAnalyzed.length},count,`);
+      lines.push(`git_summary,branch_list,"${summary.branchesAnalyzed.join(', ')}",text,`);
+    }
+    
     if (summary.firstCommitDate) {
       lines.push(`git_summary,first_commit,${summary.firstCommitDate},date,`);
     }
@@ -873,8 +888,6 @@ export async function showCommand(options: {
     printError('Not configured. Run `gdm init` first.');
     return;
   }
-  
-  printCompactHeader();
   
   const clientName = options.client || getActiveClient();
   if (!clientName) {

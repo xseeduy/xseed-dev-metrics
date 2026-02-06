@@ -117,6 +117,8 @@ export interface RepoSummary {
   activeBranches: number;
   /** Name of the current branch */
   currentBranch: string;
+  /** List of branches analyzed (for multi-branch collection) */
+  branchesAnalyzed?: string[];
 }
 
 /**
@@ -141,8 +143,10 @@ export interface FilterOptions extends DateRange {
   email?: string;
   /** List of authors to exclude */
   excludeAuthors?: string[];
-  /** Filter by branch name */
+  /** Filter by branch name (single branch - legacy option) */
   branch?: string;
+  /** Filter by multiple branches (for multi-branch analysis) */
+  branches?: string[];
   /** Whether to include merge commits */
   includeMerges?: boolean;
   /** Filter by specific file paths */
