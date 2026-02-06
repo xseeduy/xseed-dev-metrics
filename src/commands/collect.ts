@@ -154,6 +154,79 @@ function getAuthorsInRepo(
   }
 }
 
+/** Get all authors with their emails and names for flexible matching. */
+function getAuthorsWithDetails(
+  repoPath: string,
+  filterOptions: { since?: string; until?: string }
+): Array<{ name: string; email: string }> {
+  try {
+    const args: string[] = [];
+    if (filterOptions.since) args.push(`--since="${filterOptions.since}"`);
+    if (filterOptions.until) args.push(`--until="${filterOptions.until}"`);
+    const logArgs = args.join(' ');
+    // Get both name and email using format: "Name|Email"
+    const raw = execSync(`git log --use-mailmap --format='%aN|%ae' ${logArgs}`, {
+      cwd: repoPath,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+    
+    if (!raw) return [];
+    
+    const lines = raw.split('\n').filter(Boolean);
+    const authorsMap = new Map<string, { name: string; email: string }>();
+    
+    for (const line of lines) {
+      const [name, email] = line.split('|');
+      if (name && email) {
+        // Use email as key to avoid duplicates
+        authorsMap.set(email, { name, email });
+      }
+    }
+    
+    return Array.from(authorsMap.values());
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Find an author by flexible matching (name, email, or username).
+ * Returns the canonical author name if found, or null if not found.
+ */
+function findAuthorByFlexibleMatch(
+  searchTerm: string,
+  authors: Array<{ name: string; email: string }>
+): string | null {
+  const lowerSearch = searchTerm.toLowerCase().trim();
+  
+  for (const author of authors) {
+    // Match full name (case-insensitive)
+    if (author.name.toLowerCase() === lowerSearch) {
+      return author.name;
+    }
+    
+    // Match email (case-insensitive)
+    if (author.email.toLowerCase() === lowerSearch) {
+      return author.name;
+    }
+    
+    // Match username part of email (before @)
+    const emailUsername = author.email.split('@')[0].toLowerCase();
+    if (emailUsername === lowerSearch) {
+      return author.name;
+    }
+    
+    // Match first part of name (useful for "Adrian" matching "Adrian Halaburda")
+    const firstName = author.name.split(' ')[0].toLowerCase();
+    if (firstName === lowerSearch) {
+      return author.name;
+    }
+  }
+  
+  return null;
+}
+
 // ==========================================
 // Period label (human-readable report range)
 // ==========================================
@@ -689,14 +762,18 @@ export async function collectCommand(options: {
         continue;
       }
     } else {
-      // Validate that requested users exist in the repository
-      const allAuthorsInRepo = getAuthorsInRepo(repoPath, filterOptions);
+      // Validate that requested users exist in the repository (check entire history, not just the filtered period)
+      const authorsWithDetails = getAuthorsWithDetails(repoPath, {});
+      const allAuthorsNames = authorsWithDetails.map(a => a.name);
       usersToCollect = [];
       const missingUsers: string[] = [];
       
       for (const requestedUser of usernamesOption.names) {
-        if (allAuthorsInRepo.includes(requestedUser)) {
-          usersToCollect.push(requestedUser);
+        // Try flexible matching: by name, email, or username
+        const matchedAuthor = findAuthorByFlexibleMatch(requestedUser, authorsWithDetails);
+        
+        if (matchedAuthor) {
+          usersToCollect.push(matchedAuthor);
         } else {
           missingUsers.push(requestedUser);
         }
@@ -705,7 +782,12 @@ export async function collectCommand(options: {
       // Report missing users
       if (missingUsers.length > 0 && !options.quiet) {
         for (const user of missingUsers) {
-          printError(`User '${user}' not found in ${repoName} (available: ${allAuthorsInRepo.join(', ')})`);
+          // Show available authors with their emails for better debugging
+          const availableList = authorsWithDetails
+            .map(a => `${a.name} (${a.email})`)
+            .join(', ');
+          printError(`User '${user}' not found in ${repoName}`);
+          console.log(chalk.gray(`  Available authors: ${availableList}`));
         }
       }
       
