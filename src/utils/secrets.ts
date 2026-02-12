@@ -99,7 +99,7 @@ export function isLikelySecret(value: string): boolean {
     /^[a-z0-9]{32,}$/i, // Long hex/base64-like strings
     /^sk_[a-z0-9_]+$/i, // Stripe-style keys
     /^lin_[a-z0-9_]+$/i, // Linear API keys
-    /^secret_[a-z0-9_]+$/i, // Notion secrets
+    /^secret_[a-z0-9_]+$/i, // Secret-prefixed keys
     /^ghp_[a-z0-9]+$/i, // GitHub personal access tokens
     /^xox[a-z]-[a-z0-9-]+$/i, // Slack tokens
   ];

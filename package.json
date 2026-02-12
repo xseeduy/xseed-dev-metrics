@@ -32,7 +32,6 @@
   "author": "Xseed Solutions",
   "license": "MIT",
   "dependencies": {
-    "@notionhq/client": "^5.9.0",
     "chalk": "^4.1.2",
     "cli-table3": "^0.6.5",
     "commander": "^12.1.0",

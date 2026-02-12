@@ -95,8 +95,6 @@ program
   .option('-f, --format <type>', 'Output format: csv or json', 'csv')
   .option('-q, --quiet', 'Minimal output')
   .option('--scheduled', 'Mark as scheduled run (used by cron)')
-  .option('--upload', 'Force upload to Notion')
-  .option('--no-upload', 'Skip upload to Notion')
   .action(collectCommand);
 
 // ==========================================
@@ -181,7 +179,6 @@ program
       const integrations: string[] = [];
       if (client.jira.configured) integrations.push('Jira');
       if (client.linear.configured) integrations.push('Linear');
-      if (client.notion.configured) integrations.push('Notion');
       
       console.log(chalk.gray(`      Integrations: ${integrations.join(', ') || 'None'}`));
       

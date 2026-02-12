@@ -373,57 +373,9 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     }
     
     // ==========================================
-    // Step 6: Notion Integration (Optional)
+    // Step 6: Scheduler (Optional)
     // ==========================================
-    printSection('Step 6: Notion Integration (Optional)');
-    console.log(chalk.gray('  Upload metrics to Notion for easy tracking.\n'));
-    
-    const configureNotion = await askYesNo(rl, 'Configure Notion integration?', false);
-    
-    let notionConfig: { enabled: boolean; apiKey: string; parentPageId: string; clientName?: string; autoUploadOnSchedule?: boolean } | undefined;
-    if (configureNotion) {
-      console.log(chalk.gray('\n  Setup:'));
-      console.log(chalk.gray('  1. Create integration: https://notion.so/my-integrations'));
-      console.log(chalk.gray('  2. Copy the Internal Integration Secret'));
-      console.log(chalk.gray('  3. Share a page with the integration\n'));
-      
-      const notionApiKey = await askPassword(rl, 'Notion API Key');
-      const notionParentPageId = await ask(rl, 'Parent Page ID');
-      const notionClientName = await ask(rl, 'Client Name (optional, defaults to repo name)');
-      const autoUpload = await askYesNo(rl, 'Auto-upload when scheduled collection runs?', true);
-      
-      if (notionApiKey && notionParentPageId) {
-        notionConfig = {
-          enabled: true,
-          apiKey: notionApiKey,
-          parentPageId: notionParentPageId,
-          clientName: notionClientName || undefined,
-          autoUploadOnSchedule: autoUpload,
-        };
-        
-        // Test connection
-        console.log(chalk.gray('\n  Testing Notion connection...'));
-        try {
-          const { NotionClient } = await import('../integrations/notion');
-          const client = new NotionClient(notionConfig);
-          const result = await client.testConnection();
-          if (result.success) {
-            printSuccess(`Connected to Notion as ${result.user}`);
-          } else {
-            printError(`Connection failed: ${result.error}`);
-            const saveAnyway = await askYesNo(rl, 'Save configuration anyway?', false);
-            if (!saveAnyway) notionConfig = undefined;
-          }
-        } catch (error: unknown) {
-          printError(`Error: ${(error as Error).message}`);
-        }
-      }
-    }
-    
-    // ==========================================
-    // Step 7: Scheduler (Optional)
-    // ==========================================
-    printSection('Step 7: Automatic Collection (Optional)');
+    printSection('Step 6: Automatic Collection (Optional)');
     console.log(chalk.gray('  Schedule automatic metric collection.\n'));
     
     const enableScheduler = await askYesNo(rl, 'Enable weekly automatic collection?', true);
@@ -447,7 +399,6 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
       git: gitConfig,
       jira: jiraConfig,
       linear: linearConfig,
-      notion: notionConfig,
       repositories,
       scheduler: {
         enabled: enableScheduler,

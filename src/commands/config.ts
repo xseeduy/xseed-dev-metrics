@@ -65,12 +65,6 @@ async function checkConfig(testConnections: boolean): Promise<void> {
     activeClientStatus.linear.configured ? 'API Key set' : '-',
   ]);
 
-  table.push([
-    'Notion',
-    activeClientStatus.notion.configured ? chalk.green('✓ Configured') : chalk.gray('Not configured'),
-    activeClientStatus.notion.configured ? (activeClientStatus.notion.enabled ? 'Enabled' : 'Disabled') : '-',
-  ]);
-
   console.log(table.toString());
   console.log(chalk.gray(`\nConfig file: ${getConfigFilePath()}`));
   console.log(chalk.gray(`Exists: ${configFileExists() ? 'Yes' : 'No'}\n`));
@@ -116,30 +110,10 @@ async function checkConfig(testConnections: boolean): Promise<void> {
       }
     }
 
-    if (activeClientStatus.notion.configured) {
-      process.stdout.write('  Notion: ');
-      try {
-        const { getNotionConfig } = await import('../config/integrations');
-        const { NotionClient } = await import('../integrations/notion');
-        const notionConfig = getNotionConfig();
-        if (notionConfig) {
-          const client = new NotionClient(notionConfig);
-          const result = await client.testConnection();
-          if (result.success) {
-            console.log(chalk.green(`✓ Connected as ${result.user}`));
-          } else {
-            console.log(chalk.red(`✗ ${result.error}`));
-          }
-        }
-      } catch (error: unknown) {
-        console.log(chalk.red(`✗ ${(error as Error).message}`));
-      }
-    }
-    
     console.log('');
   }
 
-  if (!activeClientStatus.jira.configured && !activeClientStatus.linear.configured && !activeClientStatus.notion.configured) {
+  if (!activeClientStatus.jira.configured && !activeClientStatus.linear.configured) {
     showSetupInstructions();
   }
 }

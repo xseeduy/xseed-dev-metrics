@@ -9,7 +9,7 @@
     ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚═════╝ 
 ```
 
-Track developer productivity metrics across **Git**, **Jira**, **Linear**, and **Notion**.
+Track developer productivity metrics across **Git**, **Jira** & **Linear**.
 
 ## 🚀 Quick Start
 
@@ -67,8 +67,7 @@ This will guide you through:
 2. **Repository** - Path to the repository to track
 3. **Jira Integration** (Optional) - Connect to Atlassian Jira
 4. **Linear Integration** (Optional) - Connect to Linear
-5. **Notion Integration** (Optional) - Upload metrics to Notion
-6. **Scheduler** - Enable weekly automatic collection
+5. **Scheduler** - Enable weekly automatic collection
 
 ### Non-Interactive Setup
 
@@ -86,10 +85,6 @@ export JIRA_URL="https://company.atlassian.net"
 export JIRA_EMAIL="john@company.com"
 export JIRA_TOKEN="your_api_token"
 export LINEAR_API_KEY="lin_api_xxxxx"
-export NOTION_API_KEY="secret_xxxxx"
-export NOTION_PARENT_PAGE_ID="page_id_xxxxx"
-export NOTION_CLIENT_NAME="Acme Corp"
-export NOTION_AUTO_UPLOAD="true"
 ```
 
 ## 📊 Commands
@@ -139,7 +134,7 @@ The wizard will guide you through:
 1. **Client Name** - Enter a NEW name (e.g., "GIVEFINITY" instead of "XSEED")
 2. **Git Configuration** - Your Git username and email
 3. **Repository** - The current directory will be detected
-4. **Integrations** - Optional Jira, Linear, Notion setup
+4. **Integrations** - Optional Jira, Linear setup
 
 If a client with that name already exists, you'll be asked if you want to reconfigure it or create a new client.
 
@@ -164,7 +159,7 @@ Output example:
 ★ CLIENT_A (active)
     Repositories: 3
     Git: ✓ john.doe
-    Integrations: Git, Jira, Notion
+    Integrations: Git, Jira
     
   CLIENT_B
     Repositories: 1
@@ -204,7 +199,7 @@ gdm collect -s 2024-01-01 -u 2024-12-31  # Custom range (--since / --until)
 
 **Output Formats:**
 - **CSV** (default): Structured format with columns: `metric_type`, `metric_name`, `value`, `unit`, `details`. Perfect for Excel, Google Sheets, or data analysis tools.
-- **JSON**: Full structured data, useful for programmatic access or Notion uploads.
+- **JSON**: Full structured data, useful for programmatic access.
 
 **Collect per user (separate files):** use `--usernames` to collect metrics for specific authors or all authors. Each user gets a separate file (e.g. `repo_John_Doe_2024-01-15.csv`).
 
@@ -243,7 +238,6 @@ The daemon runs in the background and automatically:
 2. Collects Git metrics for the configured user
 3. Optionally fetches Jira/Linear metrics
 4. Saves data for historical tracking
-5. Uploads to Notion (if configured with `autoUploadOnSchedule`)
 
 ```bash
 # Start automatic collection (weekly on Monday at 9am)
@@ -284,13 +278,6 @@ Configuration is stored in `~/.xseed-metrics/config.json`:
         "email": "john@company.com",
         "token": "your_api_token"
       },
-      "notion": {
-        "enabled": true,
-        "apiKey": "secret_xxxxx",
-        "parentPageId": "page_id_xxxxx",
-        "clientName": "Acme Corp",
-        "autoUploadOnSchedule": true
-      },
       "scheduler": {
         "enabled": true,
         "interval": "weekly",
@@ -324,10 +311,6 @@ Configuration is stored in `~/.xseed-metrics/config.json`:
 | `JIRA_EMAIL` | Jira account email |
 | `JIRA_TOKEN` | Jira API token |
 | `LINEAR_API_KEY` | Linear API key |
-| `NOTION_API_KEY` | Notion integration token |
-| `NOTION_PARENT_PAGE_ID` | Notion parent page ID |
-| `NOTION_CLIENT_NAME` | Client/organization name (optional) |
-| `NOTION_AUTO_UPLOAD` | Auto-upload on scheduled runs (true/false) |
 
 ### Git Mailmap Support
 
@@ -386,67 +369,6 @@ git log --use-mailmap --format='%aN <%aE>' | sort -u
 - Throughput per cycle
 - Cycle completion rates
 - Estimate accuracy
-
-## 📝 Notion Integration
-
-Upload your collected metrics to Notion for easy tracking and visualization. The integration automatically organizes data in a hierarchical structure:
-
-```
-Git Metrics (root page)
-└── ClientName (e.g. "Acme Corp" or repo name)
-    └── git username (e.g. "John Doe")
-        └── 2025-01-29 (one page per collection date)
-            └── JSON metrics (formatted code block)
-```
-
-### Setup
-
-1. **Create Notion Integration**
-   - Go to [notion.so/my-integrations](https://www.notion.so/my-integrations)
-   - Click "New integration"
-   - Copy the "Internal Integration Secret"
-
-2. **Share a Page**
-   - Create or open a page in Notion (e.g., "My Workspace")
-   - Click "Share" → "Invite" → Add your integration
-   - Copy the page ID from the URL (`notion.so/workspace/PAGE_ID`)
-
-3. **Configure in GDM**
-   ```bash
-   gdm init  # Select "Configure Notion integration" during setup
-   ```
-   
-   Or manually add to `~/.xseed-metrics/config.json`:
-   ```json
-   "notion": {
-     "enabled": true,
-     "apiKey": "secret_xxxxx",
-     "parentPageId": "page_id_xxxxx",
-     "clientName": "Acme Corp",
-     "autoUploadOnSchedule": true
-   }
-   ```
-
-### Usage
-
-**Interactive Upload:**
-```bash
-gdm collect
-# After collection, you'll be prompted: "Upload to Notion? [Y/n]"
-```
-
-**Force Upload:**
-```bash
-gdm collect --upload
-```
-
-**Skip Upload:**
-```bash
-gdm collect --no-upload
-```
-
-**Automatic Upload (Scheduled):**
-When `autoUploadOnSchedule: true`, the weekly cron job automatically uploads without prompting.
 
 ## 📁 Data Storage
 

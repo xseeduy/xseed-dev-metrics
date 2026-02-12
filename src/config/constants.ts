@@ -70,8 +70,6 @@ export const TIME_THRESHOLDS = {
 export const DISPLAY = {
   /** String repeat count for section separators */
   SEPARATOR_LENGTH: 60,
-  /** Max length for Notion JSON content */
-  NOTION_JSON_MAX_LENGTH: 2000,
   /** Number of log lines to show by default */
   LOG_LINES_DEFAULT: 50,
 } as const;
@@ -120,8 +118,6 @@ export const CONFIG = {
 export const API_ENDPOINTS = {
   /** Linear GraphQL API endpoint */
   LINEAR_GRAPHQL: 'https://api.linear.app/graphql',
-  /** Notion integrations page */
-  NOTION_INTEGRATIONS_URL: 'https://notion.so/my-integrations',
 } as const;
 
 /**

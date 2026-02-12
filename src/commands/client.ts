@@ -42,7 +42,6 @@ export async function listClientsCommand(): Promise<void> {
     if (client.git.configured) integrations.push('Git');
     if (client.jira.configured) integrations.push('Jira');
     if (client.linear.configured) integrations.push('Linear');
-    if (client.notion.configured) integrations.push('Notion');
     
     console.log(chalk.gray(`    Integrations: ${integrations.length > 0 ? integrations.join(', ') : 'None'}`));
     
@@ -95,7 +94,6 @@ export async function switchClientCommand(clientName: string): Promise<void> {
       if (config.git) integrations.push('Git');
       if (config.jira) integrations.push('Jira');
       if (config.linear) integrations.push('Linear');
-      if (config.notion) integrations.push('Notion');
       
       console.log(chalk.gray(`    Integrations: ${integrations.join(', ') || 'None'}\n`));
     }

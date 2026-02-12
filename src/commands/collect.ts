@@ -4,6 +4,7 @@
 
 import chalk from 'chalk';
 import ora from 'ora';
+import { randomUUID } from 'crypto';
 import { execSync } from 'child_process';
 import { existsSync, writeFileSync, readdirSync, readFileSync } from 'fs';
 import { join, basename } from 'path';
@@ -27,6 +28,7 @@ import { printCompactHeader, printSuccess, printError, printWarning, printSectio
 import { DEFAULTS, TIME_THRESHOLDS } from '../config/constants';
 
 interface CollectedData {
+  collectionId: string;
   collectedAt: string;
   fileName?: string;
   period?: {
@@ -316,6 +318,7 @@ async function collectRepoMetrics(
   const trends = metrics.getStatsByPeriod({ ...multiBranchOptions, email: userEmail }, 'week');
 
   const data: CollectedData = {
+    collectionId: randomUUID(),
     collectedAt: now.toISOString(),
     period,
     repository: repoPath,
@@ -357,6 +360,7 @@ function convertToCSV(data: CollectedData): string {
   lines.push('metric_type,metric_name,value,unit,details');
   
   // Metadata
+  lines.push(`metadata,collection_id,${data.collectionId},uuid,`);
   lines.push(`metadata,collected_at,${data.collectedAt},timestamp,`);
   lines.push(`metadata,repository,${data.repoName},text,`);
   lines.push(`metadata,user_name,${data.user.username},text,`);
@@ -531,6 +535,7 @@ function parseCSVToCollectedData(csvContent: string): CollectedData | null {
   try {
     const lines = csvContent.split('\n');
     const data: any = {
+      collectionId: '',
       collectedAt: '',
       repository: '',
       repoName: '',
@@ -555,7 +560,8 @@ function parseCSVToCollectedData(csvContent: string): CollectedData | null {
       
       // Metadata
       if (metricType === 'metadata') {
-        if (metricName === 'collected_at') data.collectedAt = value;
+        if (metricName === 'collection_id') data.collectionId = value;
+        else if (metricName === 'collected_at') data.collectedAt = value;
         else if (metricName === 'repository') data.repoName = value;
         else if (metricName === 'user_name') data.user.username = value;
         else if (metricName === 'user_email') data.user.email = value;
@@ -739,7 +745,6 @@ export async function collectCommand(options: {
     repo: string; 
     success: boolean; 
     files?: string[]; 
-    uploadData?: Array<{ path: string; data: CollectedData }>; 
     error?: string 
   }> = [];
 
@@ -818,8 +823,6 @@ export async function collectCommand(options: {
       }
 
       const filesSaved: string[] = [];
-      const collectedDataForUpload: Array<{ path: string; data: CollectedData }> = [];
-
       for (const username of usersToCollect) {
         if (!singleUser && !options.quiet) {
           spinner.text = `Collecting for ${chalk.bold(username)}...`;
@@ -839,16 +842,12 @@ export async function collectCommand(options: {
         const outputFormat = options.format || 'csv';
         const filepath = saveCollectedData(repoName, data, authorSlug, clientName, outputFormat);
         filesSaved.push(filepath);
-        
-        // Store data for potential Notion upload (always needs JSON format)
-        collectedDataForUpload.push({ path: filepath, data });
       }
 
       results.push({ 
         repo: repoName, 
-        success: true, 
+        success: true,
         files: filesSaved,
-        uploadData: collectedDataForUpload 
       });
 
       spinner.succeed(
@@ -902,92 +901,6 @@ export async function collectCommand(options: {
     }
   }
 
-  // ==========================================
-  // Upload to Notion (if configured)
-  // ==========================================
-  const successful = results.filter(r => r.success);
-  if (successful.length === 0) {
-    return; // No files to upload
-  }
-
-  const { getNotionConfig } = await import('../config/integrations');
-  const notionConfig = getNotionConfig();
-
-  // Determine if we should upload
-  let shouldUpload = false;
-
-  if (options.noUpload) {
-    return; // Explicitly disabled
-  }
-
-  if (options.upload) {
-    shouldUpload = true; // Explicitly enabled
-  } else if (options.scheduled && notionConfig?.autoUploadOnSchedule) {
-    shouldUpload = true; // Scheduled run with auto-upload
-  } else if (!options.scheduled && !options.quiet && notionConfig?.enabled) {
-    // Interactive mode: prompt user
-    const readline = await import('readline');
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-
-    const answer = await new Promise<string>((resolve) => {
-      rl.question(chalk.cyan('  ? ') + 'Upload to Notion? ' + chalk.gray('[Y/n]') + ': ', (ans) => {
-        rl.close();
-        resolve(ans.trim());
-      });
-    });
-
-    shouldUpload = !answer || answer.toLowerCase().startsWith('y');
-  }
-
-  if (!shouldUpload) {
-    return;
-  }
-
-  // Check Notion config
-  if (!notionConfig) {
-    if (!options.quiet) {
-      printWarning('Notion not configured. Add notion config to upload metrics.');
-    }
-    return;
-  }
-
-  // Upload files
-  try {
-    const { NotionClient } = await import('../integrations/notion');
-    const client = new NotionClient(notionConfig);
-
-    if (!options.quiet) {
-      console.log(chalk.gray('  Uploading to Notion...'));
-    }
-
-    const spinner = ora({
-      text: 'Uploading metrics to Notion...',
-      isSilent: options.quiet,
-    }).start();
-
-    // Prepare files with data (use in-memory data since files might be CSV)
-    const filesToUpload: Array<{ path: string; data: CollectedData }> = [];
-    for (const result of successful) {
-      if (result.uploadData) {
-        filesToUpload.push(...result.uploadData);
-      }
-    }
-
-    const uploaded = await client.uploadCollectedFiles(filesToUpload);
-
-    if (uploaded > 0) {
-      spinner.succeed(`Uploaded ${uploaded} file(s) to Notion`);
-    } else {
-      spinner.fail('Failed to upload files to Notion');
-    }
-  } catch (error: unknown) {
-    if (!options.quiet) {
-      printError(`Notion upload failed: ${(error as Error).message}`);
-    }
-  }
 }
 
 // ==========================================

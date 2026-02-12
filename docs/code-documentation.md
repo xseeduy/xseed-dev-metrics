@@ -142,7 +142,6 @@ function internalHelper(value: string): string {
 
 - **`src/integrations/jira/client.ts`**: Jira API client
 - **`src/integrations/linear/client.ts`**: Linear API client
-- **`src/integrations/notion/client.ts`**: Notion API client
 
 ### Commands
 

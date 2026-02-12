@@ -43,23 +43,6 @@ export interface LinearConfig {
 }
 
 /**
- * Notion integration configuration.
- * Required for uploading metrics to Notion workspace.
- */
-export interface NotionConfig {
-  /** Whether Notion integration is enabled */
-  enabled: boolean;
-  /** Notion API key (integration secret) */
-  apiKey: string;
-  /** Parent page ID where metrics will be uploaded */
-  parentPageId: string;
-  /** Optional client/organization name */
-  clientName?: string;
-  /** Whether to automatically upload on scheduled collection runs */
-  autoUploadOnSchedule?: boolean;
-}
-
-/**
  * Git configuration for filtering commits.
  * Defines which developer's commits to track.
  */
@@ -98,8 +81,6 @@ export interface ClientConfig {
   jira?: JiraConfig;
   /** Linear configuration */
   linear?: LinearConfig;
-  /** Notion configuration */
-  notion?: NotionConfig;
   /** Scheduler configuration */
   scheduler?: SchedulerConfig;
   /** List of repository paths to track */
@@ -133,7 +114,6 @@ export interface IntegrationConfig {
   git?: GitConfig;
   jira?: JiraConfig;
   linear?: LinearConfig;
-  notion?: NotionConfig;
   scheduler?: SchedulerConfig;
   repositories?: string[];
   lastRun?: string;
@@ -155,8 +135,6 @@ export interface ClientStatus {
   jira: { configured: boolean; url?: string; email?: string };
   /** Linear configuration status */
   linear: { configured: boolean };
-  /** Notion configuration status */
-  notion: { configured: boolean; enabled?: boolean };
   /** Scheduler status */
   scheduler: { enabled: boolean; interval?: string };
 }
@@ -269,17 +247,6 @@ function getEnvConfigOverrides(): Partial<ClientConfig> {
     config.linear = { apiKey: process.env.LINEAR_API_KEY };
   }
 
-  // Notion from env
-  if (process.env.NOTION_API_KEY && process.env.NOTION_PARENT_PAGE_ID) {
-    config.notion = {
-      enabled: true,
-      apiKey: process.env.NOTION_API_KEY,
-      parentPageId: process.env.NOTION_PARENT_PAGE_ID,
-      clientName: process.env.NOTION_CLIENT_NAME,
-      autoUploadOnSchedule: process.env.NOTION_AUTO_UPLOAD === 'true',
-    };
-  }
-
   return config;
 }
 
@@ -334,7 +301,6 @@ export function getConfig(): ClientConfig | null {
     git: envOverrides.git || clientConfig.git,
     jira: envOverrides.jira || clientConfig.jira,
     linear: envOverrides.linear || clientConfig.linear,
-    notion: envOverrides.notion || clientConfig.notion,
   };
 }
 
@@ -380,17 +346,6 @@ export function getLinearConfig(): LinearConfig | null {
   const config = getConfig();
   if (!config) return null;
   return config.linear?.apiKey ? config.linear : null;
-}
-
-/**
- * Gets Notion configuration for active client if properly configured.
- * 
- * @returns Notion configuration or null if not properly configured
- */
-export function getNotionConfig(): NotionConfig | null {
-  const config = getConfig();
-  if (!config) return null;
-  return config.notion?.enabled && config.notion?.apiKey && config.notion?.parentPageId ? config.notion : null;
 }
 
 /**
@@ -518,10 +473,6 @@ export function getConfigStatus(): ConfigStatus {
           linear: {
             configured: !!config.linear?.apiKey,
           },
-          notion: {
-            configured: !!(config.notion?.enabled && config.notion?.apiKey && config.notion?.parentPageId),
-            enabled: config.notion?.enabled,
-          },
           scheduler: {
             enabled: config.scheduler?.enabled || false,
             interval: config.scheduler?.interval,
@@ -594,19 +545,6 @@ function validateClientConfig(config: Partial<ClientConfig>): void {
     const apiKeyResult = validateApiKey(config.linear.apiKey);
     if (!apiKeyResult.valid) {
       throw new Error(`Invalid Linear API key: ${apiKeyResult.error}`);
-    }
-  }
-
-  // Validate Notion config
-  if (config.notion) {
-    const apiKeyResult = validateApiKey(config.notion.apiKey);
-    if (!apiKeyResult.valid) {
-      throw new Error(`Invalid Notion API key: ${apiKeyResult.error}`);
-    }
-
-    // ParentPageId should be non-empty
-    if (!config.notion.parentPageId || config.notion.parentPageId.trim().length === 0) {
-      throw new Error('Notion parent page ID is required');
     }
   }
 
@@ -741,15 +679,6 @@ export function setJiraConfig(jiraConfig: JiraConfig): void {
  */
 export function setLinearConfig(linearConfig: LinearConfig): void {
   saveConfig({ linear: linearConfig });
-}
-
-/**
- * Sets Notion configuration for active client.
- * 
- * @param notionConfig - Notion configuration to save
- */
-export function setNotionConfig(notionConfig: NotionConfig): void {
-  saveConfig({ notion: notionConfig });
 }
 
 /**

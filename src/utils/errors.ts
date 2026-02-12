@@ -34,7 +34,7 @@ export class ValidationError extends AppError {
 }
 
 /**
- * Error for integration-related issues (Jira, Linear, Notion)
+ * Error for integration-related issues (Jira, Linear)
  */
 export class IntegrationError extends AppError {
   constructor(

@@ -80,11 +80,11 @@ CLI command implementations. Each file typically exports one or more command han
 
 - **`integrations.ts`** — Single source for multi-client app config: read/write `~/.xseed-metrics/config.json`, env overrides, client-specific paths (config dir, data dir per client, logs dir per client). Exposes:
   - Config getters: `getConfig()` (active client), `getClientConfig(name)`, `getFullConfig()`, `getActiveClient()`, `getAllClients()`
-  - Integration getters: `getJiraConfig()`, `getLinearConfig()`, `getGitConfig()`, `getNotionConfig()`
+  - Integration getters: `getJiraConfig()`, `getLinearConfig()`, `getGitConfig()`
   - Client management: `addClient()`, `removeClient()`, `switchClient()`, `clientExists()`
   - Repository management: `addRepository()`, `findRepositoryOwners()`
   - Status: `isInitialized()`, `getConfigStatus()`
-  - Setters: `saveConfig()`, `saveClientConfig()`, specific setters for Git/Jira/Linear/Notion
+  - Setters: `saveConfig()`, `saveClientConfig()`, specific setters for Git/Jira/Linear
 - **`constants.ts`** — Configuration constants and defaults
 
 ### `src/core/`
