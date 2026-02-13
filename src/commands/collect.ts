@@ -880,9 +880,16 @@ export async function collectCommand(options: {
         // Upload to Supabase if configured
         if (supabaseClient && supabaseClientId) {
           try {
+            // Look up engineer profile from config for extra fields
+            const engineerProfile = config.engineers?.find(
+              e => e.email.toLowerCase() === data.user.email.toLowerCase()
+            );
             const engineerId = await supabaseClient.resolveEngineerId(
               data.user.email,
-              data.user.username
+              data.user.username,
+              engineerProfile
+                ? { gitUsername: engineerProfile.gitUsername, slackUser: engineerProfile.slackUser }
+                : undefined
             );
             const ecId = await supabaseClient.resolveEngineerClientId(engineerId, supabaseClientId);
 

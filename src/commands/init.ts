@@ -24,6 +24,7 @@ import {
   SupabaseConfig,
   SlackConfig,
   ClientConfig,
+  EngineerProfile,
 } from '../config/integrations';
 import { printWelcome, printSuccess, printError, printWarning, printSection } from '../branding';
 import { JiraClient } from '../integrations/jira/client';
@@ -175,6 +176,52 @@ function isGitRepo(path: string): boolean {
 }
 
 // ==========================================
+// Engineer Discovery
+// ==========================================
+
+/**
+ * Discovers engineers from git history across repositories.
+ * Deduplicates by email, keeping the most recently seen name.
+ *
+ * @param repoPaths - Repository paths to scan
+ * @returns Array of discovered engineer profiles (without slackUser)
+ * @private
+ */
+function discoverEngineers(repoPaths: string[]): EngineerProfile[] {
+  const byEmail = new Map<string, { fullName: string; gitUsername: string }>();
+
+  for (const repoPath of repoPaths) {
+    try {
+      const raw = execSync("git log --use-mailmap --format='%aN|%ae'", {
+        cwd: repoPath,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim();
+
+      if (!raw) continue;
+
+      for (const line of raw.split('\n')) {
+        const [name, email] = line.split('|');
+        if (name && email) {
+          // Later entries overwrite earlier ones (most recent name wins)
+          byEmail.set(email.toLowerCase(), { fullName: name, gitUsername: name });
+        }
+      }
+    } catch {
+      // Repository might not have commits yet, skip
+    }
+  }
+
+  return Array.from(byEmail.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([email, { fullName, gitUsername }]) => ({
+      email,
+      fullName,
+      gitUsername,
+    }));
+}
+
+// ==========================================
 // Init Command
 // ==========================================
 
@@ -303,9 +350,56 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     }
     
     // ==========================================
-    // Step 4: Jira Integration (Optional)
+    // Step 4: Engineer Discovery
     // ==========================================
-    printSection('Step 4: Jira Integration (Optional)');
+    let engineers: EngineerProfile[] = [];
+
+    if (repoPath) {
+      printSection('Step 4: Engineer Discovery');
+      console.log(chalk.gray('  Scanning repository history for team members...\n'));
+
+      engineers = discoverEngineers([repoPath]);
+
+      if (engineers.length > 0) {
+        console.log(chalk.white(`  Discovered ${chalk.bold(String(engineers.length))} engineer(s):\n`));
+
+        // Display table
+        const numWidth = 4;
+        const nameWidth = 24;
+        const emailWidth = 32;
+        console.log(
+          chalk.gray(
+            `  ${'#'.padEnd(numWidth)}${'Full Name'.padEnd(nameWidth)}${'Email'.padEnd(emailWidth)}`
+          )
+        );
+
+        engineers.forEach((eng, i) => {
+          console.log(
+            `  ${chalk.gray(String(i + 1).padEnd(numWidth))}${eng.fullName.padEnd(nameWidth)}${chalk.gray(eng.email.padEnd(emailWidth))}`
+          );
+        });
+
+        console.log(chalk.gray('\n  For each engineer, enter their Slack @user:\n'));
+
+        for (const eng of engineers) {
+          let slackUser = '';
+          while (!slackUser) {
+            slackUser = await ask(rl, `${eng.email} (${eng.fullName})`);
+            if (!slackUser) {
+              printWarning('Slack @user is required.');
+            }
+          }
+          eng.slackUser = slackUser.startsWith('@') ? slackUser : `@${slackUser}`;
+        }
+      } else {
+        console.log(chalk.gray('  No engineers found in repository history.\n'));
+      }
+    }
+
+    // ==========================================
+    // Step 5: Jira Integration (Optional)
+    // ==========================================
+    printSection('Step 5: Jira Integration (Optional)');
     console.log(chalk.gray('  Connect to Atlassian Jira for additional metrics.\n'));
     
     const configureJira = await askYesNo(rl, 'Configure Jira integration?', false);
@@ -340,9 +434,9 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     }
     
     // ==========================================
-    // Step 5: Linear Integration (Optional)
+    // Step 6: Linear Integration (Optional)
     // ==========================================
-    printSection('Step 5: Linear Integration (Optional)');
+    printSection('Step 6: Linear Integration (Optional)');
     console.log(chalk.gray('  Connect to Linear for issue tracking metrics.\n'));
     
     const configureLinear = await askYesNo(rl, 'Configure Linear integration?', false);
@@ -375,80 +469,9 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     }
     
     // ==========================================
-    // Step 6: Supabase Integration (Optional)
+    // Step 7: Scheduler (Optional)
     // ==========================================
-    printSection('Step 6: Supabase Cloud Upload (Optional)');
-    console.log(chalk.gray('  Upload metrics to Supabase for dashboard access.\n'));
-    console.log(chalk.gray('  Get your keys at: https://supabase.com/dashboard/project/eqtgrxfjhgmslpxgfwho/settings/api\n'));
-
-    const configureSupabase = await askYesNo(rl, 'Configure Supabase upload?', false);
-
-    let supabaseConfig: SupabaseConfig | undefined;
-    if (configureSupabase) {
-      const supabaseUrl = await ask(rl, 'Supabase URL', 'https://eqtgrxfjhgmslpxgfwho.supabase.co');
-      const serviceKey = await askPassword(rl, 'Supabase Service Role Key');
-
-      if (supabaseUrl && serviceKey) {
-        supabaseConfig = { url: supabaseUrl, serviceRoleKey: serviceKey };
-
-        console.log(chalk.gray('\n  Testing Supabase connection...'));
-        try {
-          const { SupabaseMetricsClient } = await import('../integrations/supabase/client');
-          const client = new SupabaseMetricsClient(supabaseConfig);
-          const result = await client.testConnection();
-          if (result.success) {
-            printSuccess(`Connected to Supabase at ${result.url}`);
-          } else {
-            printError(`Connection failed: ${result.error}`);
-            const saveAnyway = await askYesNo(rl, 'Save configuration anyway?', false);
-            if (!saveAnyway) supabaseConfig = undefined;
-          }
-        } catch (error: unknown) {
-          printError(`Error: ${(error as Error).message}`);
-        }
-      }
-    }
-
-    // ==========================================
-    // Step 7: Slack Notifications (Optional)
-    // ==========================================
-    printSection('Step 7: Slack Notifications (Optional)');
-    console.log(chalk.gray('  Send collection summaries to Slack.\n'));
-
-    const configureSlack = await askYesNo(rl, 'Configure Slack notifications?', false);
-
-    let slackConfig: SlackConfig | undefined;
-    if (configureSlack) {
-      console.log(chalk.gray('\n  You need a Slack Bot Token (xoxb-...) with chat:write scope.\n'));
-
-      const botToken = await askPassword(rl, 'Slack Bot Token');
-      const defaultChannel = await ask(rl, 'Default channel or user ID (optional)');
-
-      if (botToken) {
-        slackConfig = { botToken, defaultChannel: defaultChannel || undefined };
-
-        console.log(chalk.gray('\n  Testing Slack connection...'));
-        try {
-          const { SlackNotifier } = await import('../notifications/slack');
-          const notifier = new SlackNotifier(slackConfig);
-          const result = await notifier.testConnection();
-          if (result.success) {
-            printSuccess(`Connected as bot: ${result.botName}`);
-          } else {
-            printError(`Connection failed: ${result.error}`);
-            const saveAnyway = await askYesNo(rl, 'Save configuration anyway?', false);
-            if (!saveAnyway) slackConfig = undefined;
-          }
-        } catch (error: unknown) {
-          printError(`Error: ${(error as Error).message}`);
-        }
-      }
-    }
-
-    // ==========================================
-    // Step 8: Scheduler (Optional)
-    // ==========================================
-    printSection('Step 8: Automatic Collection (Optional)');
+    printSection('Step 7: Automatic Collection (Optional)');
     console.log(chalk.gray('  Schedule automatic metric collection.\n'));
     
     const enableScheduler = await askYesNo(rl, 'Enable weekly automatic collection?', true);
@@ -472,9 +495,8 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
       git: gitConfig,
       jira: jiraConfig,
       linear: linearConfig,
-      supabase: supabaseConfig,
-      slack: slackConfig,
       repositories,
+      engineers: engineers.length > 0 ? engineers : undefined,
       scheduler: {
         enabled: enableScheduler,
         interval: 'weekly',

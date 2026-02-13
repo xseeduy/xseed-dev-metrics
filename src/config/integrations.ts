@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { CONFIG } from './constants';
+import { CONFIG, SUPABASE } from './constants';
 import {
   validateUrl,
   validateEmail,
@@ -93,6 +93,16 @@ export interface SchedulerConfig {
 }
 
 /**
+ * Engineer profile discovered from git history during init.
+ */
+export interface EngineerProfile {
+  email: string;
+  fullName: string;
+  gitUsername: string;
+  slackUser?: string;
+}
+
+/**
  * Configuration for a single client.
  * Each client has its own repositories and integration settings.
  */
@@ -111,6 +121,8 @@ export interface ClientConfig {
   scheduler?: SchedulerConfig;
   /** List of repository paths to track */
   repositories: string[];
+  /** Discovered engineer profiles */
+  engineers?: EngineerProfile[];
   /** ISO date of last scheduled run */
   lastRun?: string;
 }
@@ -398,11 +410,15 @@ export function getLinearConfig(): LinearConfig | null {
 
 /**
  * Gets Supabase configuration for active client if properly configured.
+ * Falls back to built-in defaults if no client-specific config exists.
  */
 export function getSupabaseConfig(): SupabaseConfig | null {
   const config = getConfig();
-  if (!config) return null;
-  return config.supabase?.url && config.supabase?.serviceRoleKey ? config.supabase : null;
+  if (config?.supabase?.url && config?.supabase?.serviceRoleKey) {
+    return config.supabase;
+  }
+  // Fall back to built-in defaults (shared across the team)
+  return { url: SUPABASE.URL, serviceRoleKey: SUPABASE.SERVICE_ROLE_KEY };
 }
 
 /**

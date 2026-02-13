@@ -77,19 +77,42 @@ export class SupabaseMetricsClient {
 
   /**
    * Resolves an engineer by email, creating if needed.
+   * Upserts git_username and slack_user_id when provided.
    */
-  async resolveEngineerId(email: string, fullName: string): Promise<string> {
+  async resolveEngineerId(
+    email: string,
+    fullName: string,
+    extra?: { gitUsername?: string; slackUser?: string }
+  ): Promise<string> {
     const { data: existing } = await this.client
       .from('engineers')
       .select('id')
       .eq('email', email)
       .single();
 
-    if (existing) return existing.id;
+    if (existing) {
+      // Update extra fields if provided
+      const updates: Record<string, string> = {};
+      if (extra?.gitUsername) updates.git_username = extra.gitUsername;
+      if (extra?.slackUser) updates.slack_user_id = extra.slackUser;
+
+      if (Object.keys(updates).length > 0) {
+        await this.client
+          .from('engineers')
+          .update(updates)
+          .eq('id', existing.id);
+      }
+
+      return existing.id;
+    }
+
+    const row: Record<string, string> = { email, full_name: fullName };
+    if (extra?.gitUsername) row.git_username = extra.gitUsername;
+    if (extra?.slackUser) row.slack_user_id = extra.slackUser;
 
     const { data: created, error } = await this.client
       .from('engineers')
-      .insert({ email, full_name: fullName })
+      .insert(row)
       .select('id')
       .single();
 

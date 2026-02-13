@@ -121,6 +121,15 @@ export const API_ENDPOINTS = {
 } as const;
 
 /**
+ * Built-in Supabase configuration (internal use only).
+ * These credentials are shared across the team so no individual setup is needed.
+ */
+export const SUPABASE = {
+  URL: 'https://eqtgrxfjhgmslpxgfwho.supabase.co',
+  SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxdGdyeGZqaGdtc2xweGdmd2hvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDQwODI2MywiZXhwIjoyMDg1OTg0MjYzfQ.VvvCJsMo3TRgWEFIdOzbnlhTQcrRdtim6iv6igvswy8',
+} as const;
+
+/**
  * File size limits
  */
 export const LIMITS = {
