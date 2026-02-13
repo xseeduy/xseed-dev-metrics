@@ -43,6 +43,28 @@ export interface LinearConfig {
 }
 
 /**
+ * Supabase integration configuration.
+ * Required for uploading metrics to the cloud dashboard.
+ */
+export interface SupabaseConfig {
+  /** Supabase project URL */
+  url: string;
+  /** Supabase service_role key (CLI uses admin access) */
+  serviceRoleKey: string;
+}
+
+/**
+ * Slack notification configuration.
+ * Uses Bot Token for sending DMs via chat.postMessage.
+ */
+export interface SlackConfig {
+  /** Slack Bot Token (xoxb-...) */
+  botToken: string;
+  /** Default channel or user ID for notifications */
+  defaultChannel?: string;
+}
+
+/**
  * Git configuration for filtering commits.
  * Defines which developer's commits to track.
  */
@@ -81,6 +103,10 @@ export interface ClientConfig {
   jira?: JiraConfig;
   /** Linear configuration */
   linear?: LinearConfig;
+  /** Supabase configuration */
+  supabase?: SupabaseConfig;
+  /** Slack configuration */
+  slack?: SlackConfig;
   /** Scheduler configuration */
   scheduler?: SchedulerConfig;
   /** List of repository paths to track */
@@ -135,6 +161,10 @@ export interface ClientStatus {
   jira: { configured: boolean; url?: string; email?: string };
   /** Linear configuration status */
   linear: { configured: boolean };
+  /** Supabase configuration status */
+  supabase: { configured: boolean; url?: string };
+  /** Slack configuration status */
+  slack: { configured: boolean };
   /** Scheduler status */
   scheduler: { enabled: boolean; interval?: string };
 }
@@ -247,6 +277,22 @@ function getEnvConfigOverrides(): Partial<ClientConfig> {
     config.linear = { apiKey: process.env.LINEAR_API_KEY };
   }
 
+  // Supabase from env
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    config.supabase = {
+      url: process.env.SUPABASE_URL,
+      serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    };
+  }
+
+  // Slack from env
+  if (process.env.SLACK_BOT_TOKEN) {
+    config.slack = {
+      botToken: process.env.SLACK_BOT_TOKEN,
+      defaultChannel: process.env.SLACK_DEFAULT_CHANNEL,
+    };
+  }
+
   return config;
 }
 
@@ -301,6 +347,8 @@ export function getConfig(): ClientConfig | null {
     git: envOverrides.git || clientConfig.git,
     jira: envOverrides.jira || clientConfig.jira,
     linear: envOverrides.linear || clientConfig.linear,
+    supabase: envOverrides.supabase || clientConfig.supabase,
+    slack: envOverrides.slack || clientConfig.slack,
   };
 }
 
@@ -346,6 +394,24 @@ export function getLinearConfig(): LinearConfig | null {
   const config = getConfig();
   if (!config) return null;
   return config.linear?.apiKey ? config.linear : null;
+}
+
+/**
+ * Gets Supabase configuration for active client if properly configured.
+ */
+export function getSupabaseConfig(): SupabaseConfig | null {
+  const config = getConfig();
+  if (!config) return null;
+  return config.supabase?.url && config.supabase?.serviceRoleKey ? config.supabase : null;
+}
+
+/**
+ * Gets Slack configuration for active client if properly configured.
+ */
+export function getSlackConfig(): SlackConfig | null {
+  const config = getConfig();
+  if (!config) return null;
+  return config.slack?.botToken ? config.slack : null;
 }
 
 /**
@@ -473,6 +539,13 @@ export function getConfigStatus(): ConfigStatus {
           linear: {
             configured: !!config.linear?.apiKey,
           },
+          supabase: {
+            configured: !!(config.supabase?.url && config.supabase?.serviceRoleKey),
+            url: config.supabase?.url,
+          },
+          slack: {
+            configured: !!config.slack?.botToken,
+          },
           scheduler: {
             enabled: config.scheduler?.enabled || false,
             interval: config.scheduler?.interval,
@@ -545,6 +618,22 @@ function validateClientConfig(config: Partial<ClientConfig>): void {
     const apiKeyResult = validateApiKey(config.linear.apiKey);
     if (!apiKeyResult.valid) {
       throw new Error(`Invalid Linear API key: ${apiKeyResult.error}`);
+    }
+  }
+
+  // Validate Supabase config
+  if (config.supabase) {
+    if (config.supabase.url) {
+      const urlResult = validateUrl(config.supabase.url);
+      if (!urlResult.valid) {
+        throw new Error(`Invalid Supabase URL: ${urlResult.error}`);
+      }
+    }
+    if (config.supabase.serviceRoleKey) {
+      const keyResult = validateApiKey(config.supabase.serviceRoleKey);
+      if (!keyResult.valid) {
+        throw new Error(`Invalid Supabase service role key: ${keyResult.error}`);
+      }
     }
   }
 

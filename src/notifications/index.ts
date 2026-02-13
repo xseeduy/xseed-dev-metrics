@@ -1,4 +1,5 @@
 // ============================================
-// Notifications - Placeholder
+// Notifications - Exports
 // ============================================
-// Future: Will implement Slack and other notification integrations.
+
+export { SlackNotifier } from './slack';

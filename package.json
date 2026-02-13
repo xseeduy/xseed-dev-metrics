@@ -32,6 +32,7 @@
   "author": "Xseed Solutions",
   "license": "MIT",
   "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
     "chalk": "^4.1.2",
     "cli-table3": "^0.6.5",
     "commander": "^12.1.0",

@@ -12,6 +12,8 @@ import { format, differenceInDays, parseISO } from 'date-fns';
 import {
   getConfig,
   getJiraConfig,
+  getSupabaseConfig,
+  getSlackConfig,
   getDataDir,
   saveConfig,
   isInitialized,
@@ -26,6 +28,8 @@ import { JiraClient } from '../integrations/jira/client';
 import { calculateJiraMetrics } from '../integrations/jira/metrics';
 import { printCompactHeader, printSuccess, printError, printWarning, printSection } from '../branding';
 import { DEFAULTS, TIME_THRESHOLDS } from '../config/constants';
+import { SupabaseMetricsClient } from '../integrations/supabase/client';
+import { uploadGitMetrics, uploadIntegrationMetrics, createJobRun, updateJobRun } from '../integrations/supabase/upload';
 
 interface CollectedData {
   collectionId: string;
@@ -741,11 +745,41 @@ export async function collectCommand(options: {
         until: options.until || defaultUntil,
       };
 
-  const results: Array<{ 
-    repo: string; 
-    success: boolean; 
-    files?: string[]; 
-    error?: string 
+  // ==========================================
+  // Supabase Upload Setup
+  // ==========================================
+  const supabaseConfig = getSupabaseConfig();
+  let supabaseClient: SupabaseMetricsClient | null = null;
+  let jobRunId: string | null = null;
+  let supabaseClientId: string | null = null;
+  const shouldUpload = supabaseConfig && options.noUpload !== true;
+  const collectStartTime = Date.now();
+  let uploadCount = 0;
+  const uploadErrors: string[] = [];
+
+  if (shouldUpload) {
+    try {
+      supabaseClient = new SupabaseMetricsClient(supabaseConfig!);
+      supabaseClientId = await supabaseClient.resolveClientId(clientName);
+      const jobRun = await createJobRun(supabaseClient, {
+        jobType: 'collect',
+        triggeredBy: options.scheduled ? 'scheduled' : 'cli',
+        metadata: { clientName, repos: repos.length },
+      });
+      jobRunId = jobRun.id;
+    } catch (err) {
+      if (!options.quiet) {
+        printWarning(`Supabase upload setup failed: ${(err as Error).message}`);
+      }
+      supabaseClient = null;
+    }
+  }
+
+  const results: Array<{
+    repo: string;
+    success: boolean;
+    files?: string[];
+    error?: string
   }> = [];
 
   for (const repoPath of repos) {
@@ -842,6 +876,40 @@ export async function collectCommand(options: {
         const outputFormat = options.format || 'csv';
         const filepath = saveCollectedData(repoName, data, authorSlug, clientName, outputFormat);
         filesSaved.push(filepath);
+
+        // Upload to Supabase if configured
+        if (supabaseClient && supabaseClientId) {
+          try {
+            const engineerId = await supabaseClient.resolveEngineerId(
+              data.user.email,
+              data.user.username
+            );
+            const ecId = await supabaseClient.resolveEngineerClientId(engineerId, supabaseClientId);
+
+            await uploadGitMetrics(supabaseClient, {
+              engineerClientId: ecId,
+              repoName: data.repoName,
+              periodStart: data.period?.since || null,
+              periodEnd: data.period?.until || null,
+              collectionId: data.collectionId,
+              gitMetrics: data.gitMetrics,
+            });
+
+            if (data.jiraMetrics && (data.jiraMetrics as any).available !== false) {
+              await uploadIntegrationMetrics(supabaseClient, {
+                engineerClientId: ecId,
+                source: 'jira',
+                metrics: data.jiraMetrics as Record<string, any>,
+                periodStart: data.period?.since || null,
+                periodEnd: data.period?.until || null,
+              });
+            }
+
+            uploadCount++;
+          } catch (uploadErr) {
+            uploadErrors.push(`${data.repoName}/${username}: ${(uploadErr as Error).message}`);
+          }
+        }
       }
 
       results.push({ 
@@ -867,6 +935,50 @@ export async function collectCommand(options: {
   } catch {
     // ignore
   }
+
+  // ==========================================
+  // Finalize Supabase job run
+  // ==========================================
+  if (supabaseClient && jobRunId) {
+    try {
+      await updateJobRun(supabaseClient, jobRunId, {
+        status: uploadErrors.length > 0 ? 'error' : 'success',
+        recordsProcessed: uploadCount,
+        errorMessage: uploadErrors.length > 0 ? uploadErrors.join('; ') : undefined,
+        metadata: {
+          clientName,
+          repos: repos.length,
+          durationMs: Date.now() - collectStartTime,
+        },
+      });
+    } catch {
+      // Best effort
+    }
+  }
+
+  // ==========================================
+  // Slack notification (best-effort)
+  // ==========================================
+  const slackConfig = getSlackConfig();
+  if (slackConfig && !options.quiet) {
+    try {
+      const { SlackNotifier } = await import('../notifications/slack');
+      const notifier = new SlackNotifier(slackConfig);
+      await notifier.sendCollectionSummary(undefined, {
+        clientName,
+        reposProcessed: results.filter(r => r.success).length,
+        usersCollected: results.reduce((sum, r) => sum + (r.files?.length || 0), 0),
+        uploadedToSupabase: uploadCount > 0,
+        errors: [
+          ...results.filter(r => !r.success).map(r => `${r.repo}: ${r.error}`),
+          ...uploadErrors,
+        ],
+        trigger: options.scheduled ? 'scheduled' : 'manual',
+      });
+    } catch {
+      // Slack notification is best-effort
+    }
+  }
   
   // Summary
   if (!options.quiet) {
@@ -887,6 +999,15 @@ export async function collectCommand(options: {
     if (failed.length) {
       printError(`${failed.length} failed:`);
       failed.forEach(f => console.log(chalk.gray(`    - ${f.repo}: ${f.error}`)));
+    }
+
+    if (supabaseClient) {
+      if (uploadCount > 0) {
+        printSuccess(`${uploadCount} metric(s) uploaded to Supabase`);
+      }
+      if (uploadErrors.length > 0) {
+        printWarning(`${uploadErrors.length} upload error(s)`);
+      }
     }
 
     console.log(chalk.gray(`\n  Data directory: ${getDataDir(clientName)}\n`));

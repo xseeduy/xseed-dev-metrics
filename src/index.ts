@@ -59,8 +59,12 @@ program
   .option('--jira-email <email>', 'Jira email (non-interactive)')
   .option('--jira-token <token>', 'Jira token (non-interactive)')
   .option('--linear-key <key>', 'Linear API key (non-interactive)')
+  .option('--supabase-url <url>', 'Supabase project URL (non-interactive)')
+  .option('--supabase-key <key>', 'Supabase service role key (non-interactive)')
+  .option('--slack-token <token>', 'Slack bot token (non-interactive)')
+  .option('--slack-channel <id>', 'Slack default channel/user ID (non-interactive)')
   .action(async (options) => {
-    if (options.clientName || options.username || options.email || options.jiraUrl || options.linearKey) {
+    if (options.clientName || options.username || options.email || options.jiraUrl || options.linearKey || options.supabaseUrl || options.slackToken) {
       await quickInitCommand({
         clientName: options.clientName,
         username: options.username,
@@ -71,6 +75,10 @@ program
         jiraEmail: options.jiraEmail,
         jiraToken: options.jiraToken,
         linearKey: options.linearKey,
+        supabaseUrl: options.supabaseUrl,
+        supabaseKey: options.supabaseKey,
+        slackToken: options.slackToken,
+        slackChannel: options.slackChannel,
       });
     } else {
       await initCommand({ force: options.force });
@@ -95,6 +103,7 @@ program
   .option('-f, --format <type>', 'Output format: csv or json', 'csv')
   .option('-q, --quiet', 'Minimal output')
   .option('--scheduled', 'Mark as scheduled run (used by cron)')
+  .option('--no-upload', 'Skip Supabase upload')
   .action(collectCommand);
 
 // ==========================================
@@ -179,6 +188,8 @@ program
       const integrations: string[] = [];
       if (client.jira.configured) integrations.push('Jira');
       if (client.linear.configured) integrations.push('Linear');
+      if (client.supabase.configured) integrations.push('Supabase');
+      if (client.slack.configured) integrations.push('Slack');
       
       console.log(chalk.gray(`      Integrations: ${integrations.join(', ') || 'None'}`));
       
@@ -306,6 +317,8 @@ ${chalk.bold('Environment Variables:')}
   GDM_GIT_USERNAME, GDM_GIT_EMAIL, GDM_MAIN_BRANCH
   JIRA_URL, JIRA_EMAIL, JIRA_TOKEN
   LINEAR_API_KEY
+  SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+  SLACK_BOT_TOKEN, SLACK_DEFAULT_CHANNEL
 `);
 
 // ==========================================
@@ -329,6 +342,8 @@ if (args.length === 0) {
         console.log(`    Git: ${activeClient.git.configured ? chalk.green(activeClient.git.username) : chalk.yellow('Not configured')}`);
         console.log(`    Jira: ${activeClient.jira.configured ? chalk.green('Connected') : chalk.gray('Not connected')}`);
         console.log(`    Linear: ${activeClient.linear.configured ? chalk.green('Connected') : chalk.gray('Not connected')}`);
+        console.log(`    Supabase: ${activeClient.supabase.configured ? chalk.green('Connected') : chalk.gray('Not connected')}`);
+        console.log(`    Slack: ${activeClient.slack.configured ? chalk.green('Connected') : chalk.gray('Not connected')}`);
         console.log(`    Repos: ${activeClient.repositories}`);
       }
       

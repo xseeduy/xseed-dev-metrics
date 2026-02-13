@@ -1,4 +1,8 @@
 // ============================================
-// Supabase Integration - Placeholder
+// Supabase Integration - Exports
 // ============================================
-// Phase 2: Will implement Supabase client for metrics storage.
+
+export { SupabaseMetricsClient } from './client';
+export type { SupabaseConfig } from './client';
+export { uploadGitMetrics, uploadIntegrationMetrics, createJobRun, updateJobRun } from './upload';
+export type { UploadResult, UploadSummary } from './types';

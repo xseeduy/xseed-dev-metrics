@@ -21,6 +21,8 @@ import {
   GitConfig,
   JiraConfig,
   LinearConfig,
+  SupabaseConfig,
+  SlackConfig,
   ClientConfig,
 } from '../config/integrations';
 import { printWelcome, printSuccess, printError, printWarning, printSection } from '../branding';
@@ -373,9 +375,80 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     }
     
     // ==========================================
-    // Step 6: Scheduler (Optional)
+    // Step 6: Supabase Integration (Optional)
     // ==========================================
-    printSection('Step 6: Automatic Collection (Optional)');
+    printSection('Step 6: Supabase Cloud Upload (Optional)');
+    console.log(chalk.gray('  Upload metrics to Supabase for dashboard access.\n'));
+    console.log(chalk.gray('  Get your keys at: https://supabase.com/dashboard/project/eqtgrxfjhgmslpxgfwho/settings/api\n'));
+
+    const configureSupabase = await askYesNo(rl, 'Configure Supabase upload?', false);
+
+    let supabaseConfig: SupabaseConfig | undefined;
+    if (configureSupabase) {
+      const supabaseUrl = await ask(rl, 'Supabase URL', 'https://eqtgrxfjhgmslpxgfwho.supabase.co');
+      const serviceKey = await askPassword(rl, 'Supabase Service Role Key');
+
+      if (supabaseUrl && serviceKey) {
+        supabaseConfig = { url: supabaseUrl, serviceRoleKey: serviceKey };
+
+        console.log(chalk.gray('\n  Testing Supabase connection...'));
+        try {
+          const { SupabaseMetricsClient } = await import('../integrations/supabase/client');
+          const client = new SupabaseMetricsClient(supabaseConfig);
+          const result = await client.testConnection();
+          if (result.success) {
+            printSuccess(`Connected to Supabase at ${result.url}`);
+          } else {
+            printError(`Connection failed: ${result.error}`);
+            const saveAnyway = await askYesNo(rl, 'Save configuration anyway?', false);
+            if (!saveAnyway) supabaseConfig = undefined;
+          }
+        } catch (error: unknown) {
+          printError(`Error: ${(error as Error).message}`);
+        }
+      }
+    }
+
+    // ==========================================
+    // Step 7: Slack Notifications (Optional)
+    // ==========================================
+    printSection('Step 7: Slack Notifications (Optional)');
+    console.log(chalk.gray('  Send collection summaries to Slack.\n'));
+
+    const configureSlack = await askYesNo(rl, 'Configure Slack notifications?', false);
+
+    let slackConfig: SlackConfig | undefined;
+    if (configureSlack) {
+      console.log(chalk.gray('\n  You need a Slack Bot Token (xoxb-...) with chat:write scope.\n'));
+
+      const botToken = await askPassword(rl, 'Slack Bot Token');
+      const defaultChannel = await ask(rl, 'Default channel or user ID (optional)');
+
+      if (botToken) {
+        slackConfig = { botToken, defaultChannel: defaultChannel || undefined };
+
+        console.log(chalk.gray('\n  Testing Slack connection...'));
+        try {
+          const { SlackNotifier } = await import('../notifications/slack');
+          const notifier = new SlackNotifier(slackConfig);
+          const result = await notifier.testConnection();
+          if (result.success) {
+            printSuccess(`Connected as bot: ${result.botName}`);
+          } else {
+            printError(`Connection failed: ${result.error}`);
+            const saveAnyway = await askYesNo(rl, 'Save configuration anyway?', false);
+            if (!saveAnyway) slackConfig = undefined;
+          }
+        } catch (error: unknown) {
+          printError(`Error: ${(error as Error).message}`);
+        }
+      }
+    }
+
+    // ==========================================
+    // Step 8: Scheduler (Optional)
+    // ==========================================
+    printSection('Step 8: Automatic Collection (Optional)');
     console.log(chalk.gray('  Schedule automatic metric collection.\n'));
     
     const enableScheduler = await askYesNo(rl, 'Enable weekly automatic collection?', true);
@@ -399,6 +472,8 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
       git: gitConfig,
       jira: jiraConfig,
       linear: linearConfig,
+      supabase: supabaseConfig,
+      slack: slackConfig,
       repositories,
       scheduler: {
         enabled: enableScheduler,
@@ -465,6 +540,10 @@ export async function quickInitCommand(options: {
   jiraEmail?: string;
   jiraToken?: string;
   linearKey?: string;
+  supabaseUrl?: string;
+  supabaseKey?: string;
+  slackToken?: string;
+  slackChannel?: string;
 }): Promise<void> {
   const clientName = options.clientName?.trim().toUpperCase();
   if (!clientName) {
@@ -503,7 +582,21 @@ export async function quickInitCommand(options: {
   if (options.linearKey) {
     clientConfig.linear = { apiKey: options.linearKey };
   }
-  
+
+  if (options.supabaseUrl && options.supabaseKey) {
+    clientConfig.supabase = {
+      url: options.supabaseUrl,
+      serviceRoleKey: options.supabaseKey,
+    };
+  }
+
+  if (options.slackToken) {
+    clientConfig.slack = {
+      botToken: options.slackToken,
+      defaultChannel: options.slackChannel,
+    };
+  }
+
   addClient(clientName, clientConfig, true);
   printSuccess(`Client '${clientName}' configured and activated!`);
 }
