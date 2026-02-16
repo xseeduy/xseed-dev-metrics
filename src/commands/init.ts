@@ -18,6 +18,7 @@ import {
   getActiveClient,
   switchClient,
   getClientConfig,
+  getSlackConfig,
   GitConfig,
   JiraConfig,
   LinearConfig,
@@ -29,6 +30,8 @@ import {
 import { printWelcome, printSuccess, printError, printWarning, printSection } from '../branding';
 import { JiraClient } from '../integrations/jira/client';
 import { LinearClient } from '../integrations/linear/client';
+import { SlackNotifier } from '../notifications/slack';
+import { validateSlackUserId } from '../utils/validation';
 
 // ==========================================
 // Readline Helper
@@ -379,17 +382,67 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
           );
         });
 
-        console.log(chalk.gray('\n  For each engineer, enter their Slack @user:\n'));
+        console.log(chalk.gray('\n  For each engineer, enter their Slack User ID:\n'));
+        console.log(chalk.gray('  💡 To get a Slack User ID: Click their profile → ⋮ (More) → Copy member ID\n'));
+        console.log(chalk.gray('  Format: U12345678 (starts with U followed by 8-11 characters)\n'));
+
+        // Initialize Slack notifier for validation
+        const slackConfig = getSlackConfig();
+        const slackNotifier = slackConfig ? new SlackNotifier(slackConfig) : null;
 
         for (const eng of engineers) {
-          let slackUser = '';
-          while (!slackUser) {
-            slackUser = await ask(rl, `${eng.email} (${eng.fullName})`);
+          let validated = false;
+          
+          while (!validated) {
+            const slackUser = await ask(rl, `${eng.email} (${eng.fullName})`);
+            
             if (!slackUser) {
-              printWarning('Slack @user is required.');
+              // Allow skip
+              printWarning('Slack user ID is optional but recommended for notifications.');
+              const confirmSkip = await askYesNo(rl, 'Skip this engineer?', false);
+              if (confirmSkip) {
+                validated = true; // Exit loop without setting slackUser
+                break;
+              }
+              continue; // Ask again
+            }
+            
+            // Remove @ prefix if present and validate format
+            const userId = slackUser.startsWith('@') ? slackUser.substring(1) : slackUser;
+            
+            // First validate format
+            const formatValidation = validateSlackUserId(userId);
+            if (!formatValidation.valid) {
+              printError(formatValidation.error || 'Invalid format');
+              console.log(chalk.gray('  Please try again or press Enter to skip\n'));
+              continue;
+            }
+            
+            // Then validate with Slack API if notifier is available
+            if (slackNotifier) {
+              console.log(chalk.gray('  Validating user ID and sending welcome message...'));
+              
+              const validation = await slackNotifier.validateAndSendWelcome(
+                userId,
+                eng.fullName,
+                eng.email,
+                clientName
+              );
+              
+              if (validation.success) {
+                console.log(chalk.green(`  ✓ Validated! Welcome message sent to ${validation.displayName}\n`));
+                eng.slackUser = userId;
+                validated = true;
+              } else {
+                printError(`Invalid user ID: ${validation.error}`);
+                console.log(chalk.gray('  Please try again or press Enter to skip\n'));
+              }
+            } else {
+              // If no Slack config, just save the formatted ID
+              eng.slackUser = userId;
+              validated = true;
             }
           }
-          eng.slackUser = slackUser.startsWith('@') ? slackUser : `@${slackUser}`;
         }
       } else {
         console.log(chalk.gray('  No engineers found in repository history.\n'));

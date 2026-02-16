@@ -170,3 +170,30 @@ export function validateDayOfWeek(day: number): ValidationResult {
 
   return { valid: true };
 }
+
+/**
+ * Validates Slack user ID format
+ * @param userId - Slack user ID to validate
+ * @returns Validation result with error message if invalid
+ */
+export function validateSlackUserId(userId: string): ValidationResult {
+  if (!userId || typeof userId !== 'string') {
+    return { valid: false, error: 'User ID is required' };
+  }
+
+  // Remove @ prefix if present
+  const cleanUserId = userId.startsWith('@') ? userId.substring(1) : userId;
+
+  // Slack user IDs: U + 8-11 alphanumeric characters
+  // Examples: U01ABC123, U12345678, USLACKBOT
+  const userIdRegex = /^U[A-Z0-9]{8,11}$/;
+
+  if (!userIdRegex.test(cleanUserId)) {
+    return {
+      valid: false,
+      error: 'User ID must be in format U12345678 (starts with U followed by 8-11 characters)',
+    };
+  }
+
+  return { valid: true };
+}

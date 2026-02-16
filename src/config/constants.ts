@@ -130,6 +130,14 @@ export const SUPABASE = {
 } as const;
 
 /**
+ * Built-in Slack configuration (internal use only).
+ * Bot token is shared across the team for notifications.
+ */
+export const SLACK = {
+  BOT_TOKEN: 'xoxb-137754316583-10428499602439-2u08psbvvpCvCa3ARLvNwOS1',
+} as const;
+
+/**
  * File size limits
  */
 export const LIMITS = {

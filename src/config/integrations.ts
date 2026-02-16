@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { CONFIG, SUPABASE } from './constants';
+import { CONFIG, SUPABASE, SLACK } from './constants';
 import {
   validateUrl,
   validateEmail,
@@ -425,9 +425,10 @@ export function getSupabaseConfig(): SupabaseConfig | null {
  * Gets Slack configuration for active client if properly configured.
  */
 export function getSlackConfig(): SlackConfig | null {
-  const config = getConfig();
-  if (!config) return null;
-  return config.slack?.botToken ? config.slack : null;
+  // Always return hardcoded Slack config for internal use
+  return {
+    botToken: SLACK.BOT_TOKEN,
+  };
 }
 
 /**
