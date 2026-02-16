@@ -29,24 +29,27 @@ export async function uploadGitMetrics(
 
   const { data: result, error } = await client.getClient()
     .from('git_metrics')
-    .insert({
-      engineer_client_id: data.engineerClientId,
-      repo_name: data.repoName,
-      period_start: data.periodStart || new Date().toISOString().split('T')[0],
-      period_end: data.periodEnd || new Date().toISOString().split('T')[0],
-      commits: userStats.commits || 0,
-      lines_added: userStats.linesAdded || 0,
-      lines_deleted: userStats.linesDeleted || 0,
-      files_changed: userStats.filesChanged || 0,
-      active_days: userStats.activeDays || 0,
-      avg_commits_per_day: userStats.avgCommitsPerDay || 0,
-      prs_opened: summary.prsOpened || 0,
-      prs_merged: summary.prsMerged || 0,
-      activity_by_hour: activity.byHour || {},
-      activity_by_day: activity.byDayOfWeek || {},
-      weekly_trends: data.gitMetrics.trends || {},
-      collection_id: data.collectionId,
-    })
+    .upsert(
+      {
+        engineer_client_id: data.engineerClientId,
+        repo_name: data.repoName,
+        period_start: data.periodStart || new Date().toISOString().split('T')[0],
+        period_end: data.periodEnd || new Date().toISOString().split('T')[0],
+        commits: userStats.commits || 0,
+        lines_added: userStats.linesAdded || 0,
+        lines_deleted: userStats.linesDeleted || 0,
+        files_changed: userStats.filesChanged || 0,
+        active_days: userStats.activeDays || 0,
+        avg_commits_per_day: userStats.avgCommitsPerDay || 0,
+        prs_opened: summary.prsOpened || 0,
+        prs_merged: summary.prsMerged || 0,
+        activity_by_hour: activity.byHour || {},
+        activity_by_day: activity.byDayOfWeek || {},
+        weekly_trends: data.gitMetrics.trends || {},
+        collection_id: data.collectionId,
+      },
+      { onConflict: 'engineer_client_id,repo_name,period_start,period_end' }
+    )
     .select('id')
     .single();
 
@@ -105,7 +108,10 @@ export async function uploadIntegrationMetrics(
 
   const { data: result, error } = await client.getClient()
     .from('integration_metrics')
-    .insert(rows)
+    .upsert(
+      rows,
+      { onConflict: 'engineer_client_id,source,metric_type,metric_name,period_start,period_end' }
+    )
     .select('id');
 
   if (error) {

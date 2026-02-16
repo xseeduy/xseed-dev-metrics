@@ -103,7 +103,7 @@ program
   .option('-f, --format <type>', 'Output format: csv or json', 'csv')
   .option('-q, --quiet', 'Minimal output')
   .option('--scheduled', 'Mark as scheduled run (used by cron)')
-  .option('--no-upload', 'Skip Supabase upload')
+  .option('--upload', 'Upload metrics to Supabase (auto-enabled for scheduled runs)')
   .action(collectCommand);
 
 // ==========================================

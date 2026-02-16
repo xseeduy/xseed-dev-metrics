@@ -619,7 +619,6 @@ export async function collectCommand(options: {
   quiet?: boolean;
   scheduled?: boolean;
   upload?: boolean;
-  noUpload?: boolean;
   format?: 'json' | 'csv';
 }): Promise<void> {
   // Detect common mistake: using -authors instead of --usernames
@@ -752,7 +751,7 @@ export async function collectCommand(options: {
   let supabaseClient: SupabaseMetricsClient | null = null;
   let jobRunId: string | null = null;
   let supabaseClientId: string | null = null;
-  const shouldUpload = supabaseConfig && options.noUpload !== true;
+  const shouldUpload = supabaseConfig && (options.upload === true || options.scheduled === true);
   const collectStartTime = Date.now();
   let uploadCount = 0;
   const uploadErrors: string[] = [];

@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockInsert = vi.fn();
+const mockUpsert = vi.fn();
 const mockUpdate = vi.fn();
 const mockSelect = vi.fn();
 const mockSingle = vi.fn();
@@ -14,6 +15,11 @@ const mockClient = {
   getClient: () => ({
     from: vi.fn((table: string) => ({
       insert: mockInsert.mockReturnValue({
+        select: mockSelect.mockReturnValue({
+          single: mockSingle,
+        }),
+      }),
+      upsert: mockUpsert.mockReturnValue({
         select: mockSelect.mockReturnValue({
           single: mockSingle,
         }),
@@ -55,10 +61,10 @@ describe('Supabase Upload', () => {
       });
 
       expect(result.id).toBe('new-record-id');
-      expect(mockInsert).toHaveBeenCalled();
+      expect(mockUpsert).toHaveBeenCalled();
     });
 
-    it('should throw on insert error', async () => {
+    it('should throw on upsert error', async () => {
       mockSingle.mockResolvedValue({ data: null, error: { message: 'Insert failed' } });
 
       await expect(
