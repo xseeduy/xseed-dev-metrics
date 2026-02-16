@@ -2,7 +2,7 @@
 // Date Utilities
 // ============================================
 
-import { format, parseISO, startOfWeek, getWeek, getYear } from 'date-fns';
+import { format, parseISO, getWeek, getYear } from 'date-fns';
 
 /**
  * Parses a date string in ISO format or relative format.

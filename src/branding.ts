@@ -78,15 +78,6 @@ export function printError(message: string): void {
 }
 
 /**
- * Prints an info message with an info icon.
- * 
- * @param message - The info message to display
- */
-export function printInfo(message: string): void {
-  console.log(chalk.blue('  ℹ ') + message);
-}
-
-/**
  * Prints a warning message with a warning icon.
  * 
  * @param message - The warning message to display

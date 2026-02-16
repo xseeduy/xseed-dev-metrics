@@ -326,12 +326,3 @@ export async function daemonCommand(action: string): Promise<void> {
 `));
   }
 }
-
-// ==========================================
-// Export for cron execution
-// ==========================================
-
-export async function runScheduledCollection(): Promise<void> {
-  const { collectCommand } = await import('./collect');
-  await collectCommand({ all: true, pull: true, quiet: true });
-}

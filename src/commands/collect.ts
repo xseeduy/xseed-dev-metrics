@@ -27,7 +27,7 @@ import { GitMetrics } from '../core/git-metrics';
 import { JiraClient } from '../integrations/jira/client';
 import { calculateJiraMetrics } from '../integrations/jira/metrics';
 import { printCompactHeader, printSuccess, printError, printWarning, printSection } from '../branding';
-import { DEFAULTS, TIME_THRESHOLDS } from '../config/constants';
+import { DEFAULTS } from '../config/constants';
 import { SupabaseMetricsClient } from '../integrations/supabase/client';
 import { uploadGitMetrics, uploadIntegrationMetrics, createJobRun, updateJobRun } from '../integrations/supabase/upload';
 
@@ -963,56 +963,24 @@ export async function collectCommand(options: {
   }
 
   // ==========================================
-  // Slack notification (best-effort, per-user DMs)
+  // Slack notification (best-effort)
   // ==========================================
   const slackConfig = getSlackConfig();
-  if (slackConfig && config.engineers && config.engineers.length > 0) {
+  if (slackConfig && !options.quiet) {
     try {
       const { SlackNotifier } = await import('../notifications/slack');
       const notifier = new SlackNotifier(slackConfig);
-      
-      const hasErrors = results.some(r => !r.success) || uploadErrors.length > 0;
-      const collectionDuration = Date.now() - collectStartTime;
-      
-      // Send notification to each engineer with a Slack user ID
-      for (const engineer of config.engineers) {
-        if (!engineer.slackUser) continue;
-        
-        // Extract user ID from @username format (e.g., @johndoe or U12345)
-        const userId = engineer.slackUser.startsWith('@') 
-          ? engineer.slackUser.substring(1) 
-          : engineer.slackUser;
-        
-        try {
-          if (hasErrors) {
-            // Send error notification
-            const firstError = results.find(r => !r.success);
-            await notifier.sendErrorNotification(userId, {
-              clientName,
-              phase: firstError ? 'Repository processing' : 'Upload to Supabase',
-              error: firstError?.error || uploadErrors[0] || 'Unknown error',
-              repoPath: firstError?.repo,
-              trigger: options.scheduled ? 'scheduled' : 'manual',
-            });
-          } else {
-            // Send success notification
-            await notifier.sendSuccessNotification(userId, {
-              clientName,
-              reposProcessed: results.filter(r => r.success).length,
-              usersCollected: results.reduce((sum, r) => sum + (r.files?.length || 0), 0),
-              durationMs: collectionDuration,
-              uploadedToSupabase: uploadCount > 0,
-              trigger: options.scheduled ? 'scheduled' : 'manual',
-              timestamp: new Date().toISOString(),
-            });
-          }
-        } catch (slackErr) {
-          // Individual notification failure is best-effort
-          if (!options.quiet) {
-            console.error(chalk.gray(`  Failed to send Slack notification to ${engineer.email}`));
-          }
-        }
-      }
+      await notifier.sendCollectionSummary(undefined, {
+        clientName,
+        reposProcessed: results.filter(r => r.success).length,
+        usersCollected: results.reduce((sum, r) => sum + (r.files?.length || 0), 0),
+        uploadedToSupabase: uploadCount > 0,
+        errors: [
+          ...results.filter(r => !r.success).map(r => `${r.repo}: ${r.error}`),
+          ...uploadErrors,
+        ],
+        trigger: options.scheduled ? 'scheduled' : 'manual',
+      });
     } catch {
       // Slack notification is best-effort
     }

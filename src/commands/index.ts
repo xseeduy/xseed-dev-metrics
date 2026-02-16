@@ -17,7 +17,7 @@ import {
   formatBlameStats,
 } from '../output/formatters';
 import { JiraMetrics } from '../integrations/jira/types';
-import { DEFAULTS, DISPLAY, TIME_THRESHOLDS } from '../config/constants';
+import { DEFAULTS } from '../config/constants';
 
 type OutputFormat = 'table' | 'json' | 'csv' | 'markdown';
 

@@ -143,21 +143,6 @@ export interface MultiClientConfig {
 }
 
 /**
- * @deprecated Legacy single-client configuration (for reference only)
- */
-export interface IntegrationConfig {
-  version?: string;
-  initialized?: boolean;
-  clientName?: string;
-  git?: GitConfig;
-  jira?: JiraConfig;
-  linear?: LinearConfig;
-  scheduler?: SchedulerConfig;
-  repositories?: string[];
-  lastRun?: string;
-}
-
-/**
  * Status information for a single client.
  */
 export interface ClientStatus {

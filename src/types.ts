@@ -182,21 +182,6 @@ export interface BlameStats {
 }
 
 /**
- * Code churn metrics for an author.
- * Measures code stability and refactoring patterns.
- */
-export interface CodeChurn {
-  /** Author name */
-  author: string;
-  /** Lines in recent commits (< 21 days old) that were modified */
-  newCode: number;
-  /** Lines rewritten within 21 days */
-  churnedCode: number;
-  /** Churn rate (churnedCode / totalCode) */
-  churnRate: number;
-}
-
-/**
  * Statistics aggregated by time period.
  * Used for trend analysis over time.
  */
@@ -218,27 +203,3 @@ export interface PeriodStats {
  * Determines how to aggregate statistics by time.
  */
 export type GroupBy = 'day' | 'week' | 'month' | 'year';
-
-/**
- * Comparison between two time periods for an author.
- * Used for tracking changes in productivity metrics.
- */
-export interface ComparisonStats {
-  /** Author name */
-  author: string;
-  /** Statistics for the current period */
-  currentPeriod: Partial<AuthorStats>;
-  /** Statistics for the previous period */
-  previousPeriod: Partial<AuthorStats>;
-  /** Changes between periods */
-  change: {
-    /** Absolute change in commits */
-    commits: number;
-    /** Percentage change in commits */
-    commitsPercent: number;
-    /** Absolute change in lines added */
-    linesAdded: number;
-    /** Percentage change in lines added */
-    linesAddedPercent: number;
-  };
-}
