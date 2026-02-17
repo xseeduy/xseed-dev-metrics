@@ -93,12 +93,18 @@ export interface SchedulerConfig {
 }
 
 /**
+ * Git provider platforms
+ */
+export type GitProvider = 'github' | 'gitlab' | 'bitbucket';
+
+/**
  * Engineer profile discovered from git history during init.
  */
 export interface EngineerProfile {
   email: string;
   fullName: string;
   gitUsername: string;
+  gitProvider?: GitProvider;
   slackUser?: string;
 }
 

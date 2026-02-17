@@ -77,12 +77,12 @@ export class SupabaseMetricsClient {
 
   /**
    * Resolves an engineer by email, creating if needed.
-   * Upserts git_username and slack_user_id when provided.
+   * Upserts git_username, git_provider and slack_user_id when provided.
    */
   async resolveEngineerId(
     email: string,
     fullName: string,
-    extra?: { gitUsername?: string; slackUser?: string }
+    extra?: { gitUsername?: string; gitProvider?: string; slackUser?: string }
   ): Promise<string> {
     const { data: existing } = await this.client
       .from('engineers')
@@ -94,6 +94,7 @@ export class SupabaseMetricsClient {
       // Update extra fields if provided
       const updates: Record<string, string> = {};
       if (extra?.gitUsername) updates.git_username = extra.gitUsername;
+      if (extra?.gitProvider) updates.git_provider = extra.gitProvider;
       if (extra?.slackUser) updates.slack_user_id = extra.slackUser;
 
       if (Object.keys(updates).length > 0) {
@@ -108,6 +109,7 @@ export class SupabaseMetricsClient {
 
     const row: Record<string, string> = { email, full_name: fullName };
     if (extra?.gitUsername) row.git_username = extra.gitUsername;
+    if (extra?.gitProvider) row.git_provider = extra.gitProvider;
     if (extra?.slackUser) row.slack_user_id = extra.slackUser;
 
     const { data: created, error } = await this.client

@@ -190,7 +190,7 @@ function isGitRepo(path: string): boolean {
  * @returns Array of discovered engineer profiles (without slackUser)
  * @private
  */
-function discoverEngineers(repoPaths: string[]): EngineerProfile[] {
+function discoverEngineers(repoPaths: string[], gitProvider?: 'github' | 'gitlab' | 'bitbucket'): EngineerProfile[] {
   const byEmail = new Map<string, { fullName: string; gitUsername: string }>();
 
   for (const repoPath of repoPaths) {
@@ -221,6 +221,7 @@ function discoverEngineers(repoPaths: string[]): EngineerProfile[] {
       email,
       fullName,
       gitUsername,
+      gitProvider,
     }));
 }
 
@@ -315,6 +316,20 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     
     const gitUsername = await ask(rl, 'Git Username', detected.username);
     const gitEmail = await ask(rl, 'Git Email', detected.email);
+    
+    // Git provider selection
+    console.log(chalk.gray('\n  Git Provider (where your code is hosted):'));
+    console.log(chalk.gray('    1) GitHub'));
+    console.log(chalk.gray('    2) GitLab'));
+    console.log(chalk.gray('    3) Bitbucket\n'));
+    const providerChoice = await ask(rl, 'Select provider [1-3]', '1');
+    const gitProviderMap: Record<string, 'github' | 'gitlab' | 'bitbucket'> = {
+      '1': 'github',
+      '2': 'gitlab',
+      '3': 'bitbucket',
+    };
+    const gitProvider = gitProviderMap[providerChoice] || 'github';
+    
     const mainBranch = await ask(rl, 'Main Branch (main/master)', detectedBranch);
     
     const gitConfig: GitConfig = {
@@ -361,7 +376,7 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
       printSection('Step 4: Engineer Discovery');
       console.log(chalk.gray('  Scanning repository history for team members...\n'));
 
-      engineers = discoverEngineers([repoPath]);
+      engineers = discoverEngineers([repoPath], gitProvider);
 
       if (engineers.length > 0) {
         console.log(chalk.white(`  Discovered ${chalk.bold(String(engineers.length))} engineer(s):\n`));

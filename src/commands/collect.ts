@@ -887,7 +887,11 @@ export async function collectCommand(options: {
               data.user.email,
               data.user.username,
               engineerProfile
-                ? { gitUsername: engineerProfile.gitUsername, slackUser: engineerProfile.slackUser }
+                ? { 
+                    gitUsername: engineerProfile.gitUsername, 
+                    gitProvider: engineerProfile.gitProvider,
+                    slackUser: engineerProfile.slackUser 
+                  }
                 : undefined
             );
             const ecId = await supabaseClient.resolveEngineerClientId(engineerId, supabaseClientId);
