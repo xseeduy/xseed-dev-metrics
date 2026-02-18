@@ -681,56 +681,75 @@ export async function collectCommand(options: {
   // Determine which repos to collect from
   let repos: string[] = [];
 
-  if (options.repo) {
+  if (options.all && config.repositories?.length) {
+    repos = config.repositories;
+  } else if (options.repo) {
     repos = [options.repo];
-  } else if (config.repositories?.length) {
-    repos = options.all ? config.repositories : [config.repositories[0]];
   } else {
-    // Use current directory
     const cwd = process.cwd();
-    try {
-      execSync('git rev-parse --git-dir', { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
-      
-      // Check if this repo is configured for any client
-      const owners = findRepositoryOwners(cwd);
-      
-      if (owners.length === 0) {
-        // Repository not configured - ask to add it
-        if (!options.quiet) {
-          console.log(chalk.yellow(`\n  Repository not configured: ${cwd}\n`));
-          
-          const readline = await import('readline');
-          const rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout,
-          });
-          
-          const answer = await new Promise<string>((resolve) => {
-            rl.question(chalk.cyan('  ? ') + `Add to client '${clientName}'? ` + chalk.gray('[Y/n]') + ': ', (ans) => {
-              rl.close();
-              resolve(ans.trim());
+    const matchedRepo = config.repositories?.find(r =>
+      cwd === r || cwd.startsWith(r + '/')
+    );
+
+    if (matchedRepo) {
+      repos = [matchedRepo];
+    } else {
+      // CWD is not a configured repo — try to detect/register it as a git repo
+      try {
+        execSync('git rev-parse --git-dir', { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
+
+        // Check if this repo is configured for any client
+        const owners = findRepositoryOwners(cwd);
+
+        if (owners.length === 0) {
+          // Repository not configured - ask to add it
+          if (!options.quiet) {
+            console.log(chalk.yellow(`\n  Repository not configured: ${cwd}\n`));
+
+            const readline = await import('readline');
+            const rl = readline.createInterface({
+              input: process.stdin,
+              output: process.stdout,
             });
-          });
-          
-          if (!answer || answer.toLowerCase().startsWith('y')) {
-            addRepository(cwd);
-            console.log(chalk.green(`  ✓ Repository added to '${clientName}'\n`));
-          } else {
-            printError('Repository not configured. Use --repo to specify a different path.');
-            return;
+
+            const answer = await new Promise<string>((resolve) => {
+              rl.question(chalk.cyan('  ? ') + `Add to client '${clientName}'? ` + chalk.gray('[Y/n]') + ': ', (ans) => {
+                rl.close();
+                resolve(ans.trim());
+              });
+            });
+
+            if (!answer || answer.toLowerCase().startsWith('y')) {
+              addRepository(cwd);
+              console.log(chalk.green(`  ✓ Repository added to '${clientName}'\n`));
+            } else {
+              printError('Repository not configured. Use --repo to specify a different path.');
+              return;
+            }
           }
+        } else if (!owners.includes(clientName)) {
+          // Repository belongs to different client(s)
+          printWarning(`Repository belongs to: ${owners.join(', ')}`);
+          printError(`Use --client ${owners[0]} or add it to '${clientName}' first.`);
+          return;
         }
-      } else if (!owners.includes(clientName)) {
-        // Repository belongs to different client(s)
-        printWarning(`Repository belongs to: ${owners.join(', ')}`);
-        printError(`Use --client ${owners[0]} or add it to '${clientName}' first.`);
-        return;
+
+        repos = [cwd];
+      } catch {
+        // Not a git repo — fall back to first configured repo
+        if (config.repositories?.length) {
+          repos = [config.repositories[0]];
+        } else {
+          printError('Not a git repository. Run `gdm init` or specify with --repo');
+          return;
+        }
       }
-      
-      repos = [cwd];
-    } catch {
-      printError('Not a git repository. Run `gdm init` or specify with --repo');
-      return;
+    }
+
+    // Hint when collecting a single repo but multiple are configured
+    if (repos.length === 1 && config.repositories && config.repositories.length > 1 && !options.quiet) {
+      console.log(chalk.gray(`  Collecting from: ${getRepoName(repos[0])}`));
+      console.log(chalk.gray(`  Tip: use --all to collect from all ${config.repositories.length} repositories\n`));
     }
   }
 
