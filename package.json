@@ -37,7 +37,6 @@
     "cli-table3": "^0.6.5",
     "commander": "^12.1.0",
     "date-fns": "^3.6.0",
-    "dotenv": "^17.3.1",
     "node-cron": "^3.0.3",
     "ora": "^5.4.1",
     "simple-git": "^3.27.0"

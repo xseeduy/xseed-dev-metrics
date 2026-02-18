@@ -2,10 +2,6 @@
 // Application Constants
 // ============================================
 
-// Load environment variables from .env file
-import { config } from 'dotenv';
-config();
-
 /**
  * Default values for commands and operations
  */
@@ -126,21 +122,19 @@ export const API_ENDPOINTS = {
 
 /**
  * Built-in Supabase configuration.
- * Loads from environment variables (.env file) or falls back to hardcoded defaults.
- * For internal use - shared credentials across the team.
+ * Hardcoded for internal team use. Environment variables can override if set.
  */
 export const SUPABASE = {
-  URL: process.env.SUPABASE_URL || '',
-  SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  URL: 'https://eqtgrxfjhgmslpxgfwho.supabase.co',
+  SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxdGdyeGZqaGdtc2xweGdmd2hvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDQwODI2MywiZXhwIjoyMDg1OTg0MjYzfQ.VvvCJsMo3TRgWEFIdOzbnlhTQcrRdtim6iv6igvswy8',
 } as const;
 
 /**
  * Built-in Slack configuration.
- * Loads from environment variables (.env file) or falls back to hardcoded defaults.
- * Bot token is shared across the team for notifications.
+ * Hardcoded for internal team use.
  */
 export const SLACK = {
-  BOT_TOKEN: process.env.SLACK_BOT_TOKEN || '',
+  BOT_TOKEN: 'xoxb-137754316583-10428499602439-2u08psbvvpCvCa3ARLvNwOS1',
 } as const;
 
 /**
