@@ -255,8 +255,8 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
       console.log(`      Linear: ${client.linear.configured ? chalk.green('✓ Connected') : chalk.gray('Not configured')}`);
     }
     
-    console.log(`\n  Run ${chalk.cyan('gdm init --force')} to add/update a client.`);
-    console.log(`  Run ${chalk.cyan('gdm client')} to manage clients.\n`);
+    console.log(`\n  Run ${chalk.cyan('metrix init --force')} to add/update a client.`);
+    console.log(`  Run ${chalk.cyan('metrix client')} to manage clients.\n`);
     return;
   }
   
@@ -583,13 +583,13 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     // ==========================================
     printSection('Next Steps');
     console.log(chalk.white('  Run these commands to get started:\n'));
-    console.log(`    ${chalk.cyan('gdm collect')}     - Collect metrics now`);
-    console.log(`    ${chalk.cyan('gdm report')}      - Generate a report`);
-    console.log(`    ${chalk.cyan('gdm status')}      - Show configuration status`);
+    console.log(`    ${chalk.cyan('metrix collect')}     - Collect metrics now`);
+    console.log(`    ${chalk.cyan('metrix report')}      - Generate a report`);
+    console.log(`    ${chalk.cyan('metrix status')}      - Show configuration status`);
     
     if (enableScheduler) {
       console.log(`\n  ${chalk.gray('Scheduler enabled - metrics will be collected weekly.')}`);
-      console.log(`  ${chalk.gray('Run')} ${chalk.cyan('gdm daemon start')} ${chalk.gray('to start the background service.')}`);
+      console.log(`  ${chalk.gray('Run')} ${chalk.cyan('metrix daemon start')} ${chalk.gray('to start the background service.')}`);
     }
     
     console.log('');

@@ -73,8 +73,8 @@ CLI command implementations. Each file typically exports one or more command han
 | `client.ts` | Client management commands: list all clients, switch active client, remove clients. |
 | `daemon.ts` | Daemon/scheduler: start, stop, status, logs, run. Manages cron for weekly/daily collection. Works with active client. |
 | `config.ts` | Integration config: check, init, test connections. |
-| `jira.ts` | `gdm jira -p PROJECT` — Jira project metrics. |
-| `linear.ts` | `gdm linear -t TEAM` — Linear team metrics. |
+| `jira.ts` | `metrix jira -p PROJECT` — Jira project metrics. |
+| `linear.ts` | `metrix linear -t TEAM` — Linear team metrics. |
 
 ### `src/config/`
 

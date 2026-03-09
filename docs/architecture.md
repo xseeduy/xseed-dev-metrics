@@ -79,7 +79,7 @@ flowchart TB
 
 ## Data Flow
 
-### One-off Git analysis (e.g. `gdm authors`)
+### One-off Git analysis (e.g. `metrix authors`)
 
 ```mermaid
 sequenceDiagram
@@ -90,7 +90,7 @@ sequenceDiagram
   participant Formatters
   participant Git as git CLI
 
-  User->>Index: gdm authors [path]
+  User->>Index: metrix authors [path]
   Index->>Command: authorsCommand(path, options)
   Command->>Command: build FilterOptions
   Command->>GitMetrics: new GitMetrics(path)
@@ -103,7 +103,7 @@ sequenceDiagram
   Command->>User: print or write to file
 ```
 
-1. User runs `gdm authors [path]`.
+1. User runs `metrix authors [path]`.
 2. `index.ts` parses and calls `authorsCommand(path, options)`.
 3. Command builds `FilterOptions`, instantiates `GitMetrics(path)`, calls `getAuthorStats(filterOptions)`.
 4. `GitMetrics` runs `git log` (and related) commands, parses output, returns `AuthorStats[]`.
@@ -114,7 +114,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-  A[gdm collect] --> B[getConfig]
+  A[metrix collect] --> B[getConfig]
   B --> C{per repo}
   C --> D[git pull]
   C --> E[GitMetrics]
@@ -126,7 +126,7 @@ flowchart LR
   H --> I[update lastRun]
 ```
 
-1. User runs `gdm collect` (or daemon runs it), optionally specifying `--client <name>` or using the active client.
+1. User runs `metrix collect` (or daemon runs it), optionally specifying `--client <name>` or using the active client.
 2. Command reads repos and Git config from `getConfig()` for the active/specified client; optionally pulls (git), then uses `GitMetrics` per repo; optionally fetches Jira/Linear via integration clients.
 3. Aggregated payload (e.g. summary, userStats, activity, trends, optional Jira) is written to client-specific `getDataDir(clientName)` as JSON (e.g. `CLIENT_A/repo-name_YYYY-MM-DD.json`).
 4. Config can be updated (e.g. `lastRun` for that client). Unconfigured repositories prompt the user to add them to the active client.
@@ -136,13 +136,13 @@ flowchart LR
 ```mermaid
 flowchart TB
   subgraph User["User actions"]
-    Start[gdm daemon start]
-    Stop[gdm daemon stop/status/logs]
+    Start[metrix daemon start]
+    Stop[metrix daemon stop/status/logs]
   end
 
   subgraph Cron["System cron"]
     Schedule["Cron job\n(e.g. Mon 9am)"]
-    Run["gdm collect --all --quiet"]
+    Run["metrix collect --all --quiet"]
   end
 
   Start --> Check{config.scheduler?}
@@ -156,9 +156,9 @@ flowchart TB
   Read --> Report[Report or remove cron]
 ```
 
-1. `gdm daemon start`: ensure config has scheduler enabled, then install a cron job that runs `gdm collect --all --quiet` at the configured interval (e.g. weekly Monday 9am).
+1. `metrix daemon start`: ensure config has scheduler enabled, then install a cron job that runs `metrix collect --all --quiet` at the configured interval (e.g. weekly Monday 9am).
 2. Cron runs in the user’s environment; stdout/stderr are appended to daemon log.
-3. `gdm daemon status/logs/stop` read PID file, crontab, or log file and report or remove cron.
+3. `metrix daemon status/logs/stop` read PID file, crontab, or log file and report or remove cron.
 
 ## Integration Pattern
 
@@ -176,7 +176,7 @@ flowchart TB
   end
 
   subgraph CLI["CLI"]
-    Command["commands/acme.ts\ngdm acme -p PROJECT"]
+    Command["commands/acme.ts\nmetrix acme -p PROJECT"]
     Report["reportCommand\noptional Acme section"]
   end
 
@@ -199,7 +199,7 @@ To add a new integration (e.g. “Acme” issue tracker):
 2. **Client**: In `src/integrations/acme/client.ts`, implement an API client (auth, request/retry, methods to fetch issues/sprints). Use config from `config/integrations` (add `AcmeConfig` and getter/setter if needed).
 3. **Metrics**: In `src/integrations/acme/metrics.ts`, implement pure functions that map API responses to metric objects (cycle time, throughput, etc.).
 4. **Config**: Extend `IntegrationConfig` and config file shape; add env vars and getter/setter in `config/integrations.ts`; optionally extend `init` wizard.
-5. **Command**: Add `src/commands/acme.ts` and register in `index.ts` (e.g. `gdm acme -p PROJECT`).
+5. **Command**: Add `src/commands/acme.ts` and register in `index.ts` (e.g. `metrix acme -p PROJECT`).
 6. **Report**: Optionally plug into `reportCommand` in `commands/index.ts` to include Acme metrics in the full report.
 
 Keep **network and I/O in the client**, **pure metric computation in metrics**, and **CLI flow in commands**.
@@ -213,7 +213,7 @@ Keep **network and I/O in the client**, **pure metric computation in metrics**, 
 ## Concurrency
 
 - No shared in-memory state between commands; each run is independent.
-- Daemon does not keep a long-running process; it relies on cron to spawn `gdm collect` periodically. So no concurrency between daemon and collect beyond the OS scheduler.
+- Daemon does not keep a long-running process; it relies on cron to spawn `metrix collect` periodically. So no concurrency between daemon and collect beyond the OS scheduler.
 
 ## Multi-Client Architecture
 
@@ -223,7 +223,7 @@ The CLI supports managing multiple clients (organizations/projects) with separat
 
 - **Multiple clients**: Track metrics for different clients/organizations independently
 - **Active client**: One client is active at a time; commands operate on the active client by default
-- **Client switching**: `gdm client:switch <name>` changes the active client
+- **Client switching**: `metrix client:switch <name>` changes the active client
 - **Per-client isolation**:
   - Data: `~/.xseed-metrics/data/CLIENT_NAME/`
   - Logs: `~/.xseed-metrics/logs/CLIENT_NAME/`
@@ -256,11 +256,11 @@ The CLI supports managing multiple clients (organizations/projects) with separat
 
 ### Client Management Commands
 
-- `gdm client` - List all configured clients
-- `gdm client:switch <name>` - Switch active client
-- `gdm client:remove <name>` - Remove a client
-- `gdm collect --client <name>` - Collect for specific client (temporarily switches)
-- `gdm clean --client <name> --data` - Clean specific client's data
+- `metrix client` - List all configured clients
+- `metrix client:switch <name>` - Switch active client
+- `metrix client:remove <name>` - Remove a client
+- `metrix collect --client <name>` - Collect for specific client (temporarily switches)
+- `metrix clean --client <name> --data` - Clean specific client's data
 
 ## Security and Secrets
 

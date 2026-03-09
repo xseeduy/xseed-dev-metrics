@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "bin": {
     "xseed-metrics": "./dist/index.js",
-    "gdm": "./dist/index.js"
+    "metrix": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",

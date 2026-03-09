@@ -223,20 +223,20 @@ Your `xseed-dev-metrics` CLI could be enhanced with branch tracking:
 
 ```bash
 # List branch statistics
-gdm branches                    # All branches
-gdm branches --unmerged         # Only unmerged
-gdm branches --stale --days 30  # Stale branches
+metrix branches                    # All branches
+metrix branches --unmerged         # Only unmerged
+metrix branches --stale --days 30  # Stale branches
 
 # Compare branches
-gdm branch-compare develop      # Compare develop to main
-gdm branch-compare feat1 feat2  # Compare two branches
+metrix branch-compare develop      # Compare develop to main
+metrix branch-compare feat1 feat2  # Compare two branches
 
 # Branch activity report
-gdm branch-activity develop     # Activity for one branch
-gdm branch-activity --all       # All unmerged branches
+metrix branch-activity develop     # Activity for one branch
+metrix branch-activity --all       # All unmerged branches
 
 # Collect metrics for specific branch
-gdm collect --branch develop    # Already supported!
+metrix collect --branch develop    # Already supported!
 ```
 
 ---
@@ -252,7 +252,7 @@ git log origin/develop..main --oneline
 # 116694d Refactor author filtering (email priority)
 # 7c015a5 Enhance README for output formats
 # dbb14d9 Update default metrics period to 7 days
-# 599e43d Update CLI references to 'gdm'
+# 599e43d Update CLI references to 'metrix'
 # 293a0a9 Add client addition process
 # fd03e84 Refactor configuration handling
 # 07e1ef0 Implement multi-client support

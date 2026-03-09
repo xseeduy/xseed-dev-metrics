@@ -36,7 +36,7 @@ async function checkConfig(testConnections: boolean): Promise<void> {
   console.log(chalk.bold.cyan('\n🔧 INTEGRATION CONFIGURATION\n'));
 
   if (!status.initialized || !status.activeClient) {
-    console.log(chalk.yellow('⚠ No configuration found. Run gdm init to set up.\n'));
+    console.log(chalk.yellow('⚠ No configuration found. Run metrix init to set up.\n'));
     return;
   }
 
@@ -126,7 +126,7 @@ function showSetupInstructions(): void {
   console.log(chalk.gray('  export JIRA_TOKEN=your_api_token'));
   console.log(chalk.gray('  # Get token: https://id.atlassian.com/manage-profile/security/api-tokens\n'));
   console.log(chalk.bold.cyan('Option 2: Config File\n'));
-  console.log(chalk.gray(`  Run: gdm config --init\n`));
+  console.log(chalk.gray(`  Run: metrix config --init\n`));
 }
 
 async function initConfig(): Promise<void> {
@@ -159,6 +159,6 @@ async function initConfig(): Promise<void> {
   console.log(chalk.green(`\n✓ Created config at: ${configPath}\n`));
   console.log(chalk.bold('Next steps:'));
   console.log(chalk.gray('  1. Edit the config file with your credentials'));
-  console.log(chalk.gray('  2. Run: gdm config --test'));
-  console.log(chalk.gray('  3. Try: gdm jira -p YOUR_PROJECT_KEY\n'));
+  console.log(chalk.gray('  2. Run: metrix config --test'));
+  console.log(chalk.gray('  3. Try: metrix jira -p YOUR_PROJECT_KEY\n'));
 }

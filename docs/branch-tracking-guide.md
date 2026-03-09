@@ -299,26 +299,26 @@ git diff main...feature-branch > review.patch
 
 Your CLI tool could add these commands:
 
-#### `gdm branches` - List branch statistics
+#### `metrix branches` - List branch statistics
 
 ```bash
-gdm branches --unmerged  # Show unmerged branches
-gdm branches --stale     # Show branches with no activity > 30 days
-gdm branches --author <name>  # Branches by specific author
+metrix branches --unmerged  # Show unmerged branches
+metrix branches --stale     # Show branches with no activity > 30 days
+metrix branches --author <name>  # Branches by specific author
 ```
 
-#### `gdm branch-compare` - Compare branches
+#### `metrix branch-compare` - Compare branches
 
 ```bash
-gdm branch-compare feature-branch  # Compare to main
-gdm branch-compare branch-A branch-B  # Compare two branches
+metrix branch-compare feature-branch  # Compare to main
+metrix branch-compare branch-A branch-B  # Compare two branches
 ```
 
-#### `gdm branch-activity` - Branch activity report
+#### `metrix branch-activity` - Branch activity report
 
 ```bash
-gdm branch-activity feature-branch  # Show commits, authors, files
-gdm branch-activity --all-unmerged  # Report for all unmerged branches
+metrix branch-activity feature-branch  # Show commits, authors, files
+metrix branch-activity --all-unmerged  # Report for all unmerged branches
 ```
 
 ---

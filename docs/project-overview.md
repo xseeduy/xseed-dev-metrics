@@ -2,7 +2,7 @@
 
 ## What It Is
 
-**Xseed Developer Metrics CLI** (branded as **gdm** / **xseed-metrics**) is a command-line tool that tracks developer productivity metrics across **Git**, **Jira**, and **Linear**. It is designed for staff augmentation companies and teams that need to measure and report on individual developer contributions and correlate them with issue-tracking data.
+**Xseed Developer Metrics CLI** (branded as **metrix** / **xseed-metrics**) is a command-line tool that tracks developer productivity metrics across **Git**, **Jira**, and **Linear**. It is designed for staff augmentation companies and teams that need to measure and report on individual developer contributions and correlate them with issue-tracking data.
 
 ## Goals
 
@@ -26,12 +26,12 @@
 
 ## Configuration
 
-- **Config file**: `~/.xseed-metrics/config.json` (multi-client structure, created/updated by `gdm init`).
+- **Config file**: `~/.xseed-metrics/config.json` (multi-client structure, created/updated by `metrix init`).
 - **Multi-client support**: Track multiple clients/organizations with separate configurations
   - Active client: One client active at a time
   - Per-client data: `~/.xseed-metrics/data/CLIENT_NAME/`
   - Per-client logs: `~/.xseed-metrics/logs/CLIENT_NAME/`
-- **Client management**: Commands to list, switch, and remove clients (`gdm client`, `gdm client:switch`, `gdm client:remove`)
+- **Client management**: Commands to list, switch, and remove clients (`metrix client`, `metrix client:switch`, `metrix client:remove`)
 - **Environment variables** override file config: `GDM_GIT_USERNAME`, `GDM_GIT_EMAIL`, `GDM_MAIN_BRANCH`, `JIRA_*`, `LINEAR_API_KEY`.
 
 ## Commands Summary

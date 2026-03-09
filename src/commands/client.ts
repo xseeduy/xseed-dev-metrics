@@ -27,7 +27,7 @@ export async function listClientsCommand(): Promise<void> {
 
   if (status.totalClients === 0) {
     printWarning('No clients configured.');
-    console.log(chalk.gray(`\n  Run ${chalk.cyan('gdm init')} to create your first client.\n`));
+    console.log(chalk.gray(`\n  Run ${chalk.cyan('metrix init')} to create your first client.\n`));
     return;
   }
 
@@ -53,9 +53,9 @@ export async function listClientsCommand(): Promise<void> {
   }
 
   console.log(chalk.gray('  Commands:'));
-  console.log(chalk.gray(`    ${chalk.cyan('gdm client:switch <name>')}  Switch active client`));
-  console.log(chalk.gray(`    ${chalk.cyan('gdm client:remove <name>')}  Remove a client`));
-  console.log(chalk.gray(`    ${chalk.cyan('gdm init --force')}          Add/update a client\n`));
+  console.log(chalk.gray(`    ${chalk.cyan('metrix client:switch <name>')}  Switch active client`));
+  console.log(chalk.gray(`    ${chalk.cyan('metrix client:remove <name>')}  Remove a client`));
+  console.log(chalk.gray(`    ${chalk.cyan('metrix init --force')}          Add/update a client\n`));
 }
 
 // ==========================================
@@ -70,7 +70,7 @@ export async function listClientsCommand(): Promise<void> {
 export async function switchClientCommand(clientName: string): Promise<void> {
   if (!clientName) {
     printError('Client name is required.');
-    console.log(chalk.gray(`\n  Usage: ${chalk.cyan('gdm client:switch <name>')}\n`));
+    console.log(chalk.gray(`\n  Usage: ${chalk.cyan('metrix client:switch <name>')}\n`));
     return;
   }
 
@@ -99,7 +99,7 @@ export async function switchClientCommand(clientName: string): Promise<void> {
     }
   } catch (error) {
     printError((error as Error).message);
-    console.log(chalk.gray(`\n  Run ${chalk.cyan('gdm client')} to see available clients.\n`));
+    console.log(chalk.gray(`\n  Run ${chalk.cyan('metrix client')} to see available clients.\n`));
   }
 }
 
@@ -117,7 +117,7 @@ export async function switchClientCommand(clientName: string): Promise<void> {
 export async function removeClientCommand(clientName: string, options: { force?: boolean } = {}): Promise<void> {
   if (!clientName) {
     printError('Client name is required.');
-    console.log(chalk.gray(`\n  Usage: ${chalk.cyan('gdm client:remove <name>')}\n`));
+    console.log(chalk.gray(`\n  Usage: ${chalk.cyan('metrix client:remove <name>')}\n`));
     return;
   }
 
@@ -125,7 +125,7 @@ export async function removeClientCommand(clientName: string, options: { force?:
   
   if (!config) {
     printError(`Client '${clientName}' not found.`);
-    console.log(chalk.gray(`\n  Run ${chalk.cyan('gdm client')} to see available clients.\n`));
+    console.log(chalk.gray(`\n  Run ${chalk.cyan('metrix client')} to see available clients.\n`));
     return;
   }
 
@@ -147,7 +147,7 @@ export async function removeClientCommand(clientName: string, options: { force?:
   }
   
   console.log(chalk.gray(`\n  Note: This does NOT delete collected data or logs.`));
-  console.log(chalk.gray(`  Use ${chalk.cyan('gdm clean --config --client ' + clientName)} to remove data too.\n`));
+  console.log(chalk.gray(`  Use ${chalk.cyan('metrix clean --config --client ' + clientName)} to remove data too.\n`));
 
   // Ask for confirmation unless --force
   if (!options.force) {
@@ -180,7 +180,7 @@ export async function removeClientCommand(clientName: string, options: { force?:
     if (newActive && newActive !== clientName) {
       console.log(chalk.gray(`\n  Active client is now: ${chalk.cyan(newActive)}\n`));
     } else if (!newActive) {
-      console.log(chalk.gray(`\n  No active client. Run ${chalk.cyan('gdm init')} to create a client.\n`));
+      console.log(chalk.gray(`\n  No active client. Run ${chalk.cyan('metrix init')} to create a client.\n`));
     }
   } else {
     printError('Failed to remove client');

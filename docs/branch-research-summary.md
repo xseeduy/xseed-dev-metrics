@@ -156,20 +156,20 @@ Your `xseed-dev-metrics` tool already has the foundation. Consider adding:
 
 ```bash
 # Branch listing with metrics
-gdm branches [--unmerged] [--stale] [--days <n>]
+metrix branches [--unmerged] [--stale] [--days <n>]
 
 # Branch comparison
-gdm branch-compare <branch1> [branch2]
+metrix branch-compare <branch1> [branch2]
 
 # Branch activity report
-gdm branch-activity <branch> [--format csv|json|table]
+metrix branch-activity <branch> [--format csv|json|table]
 ```
 
 ### Existing Command Enhancement
 
 Your tool already supports:
 ```bash
-gdm collect --branch develop  # Collect metrics for specific branch
+metrix collect --branch develop  # Collect metrics for specific branch
 ```
 
 You could enhance this to:
@@ -380,7 +380,7 @@ Recent work in main not in develop:
 - Refactor author filtering (email priority)
 - Enhance README for output formats
 - Update default metrics period to 7 days
-- Update CLI references to 'gdm'
+- Update CLI references to 'metrix'
 - Add client addition process
 - Refactor configuration handling
 - Implement multi-client support

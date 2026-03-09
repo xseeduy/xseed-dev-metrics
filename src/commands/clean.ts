@@ -336,7 +336,7 @@ export async function cleanCommand(options: {
   // Validate client exists if specified
   if (options.client && !clientExists(options.client)) {
     printError(`Client '${options.client}' not found.`);
-    console.log(chalk.gray(`\n  Run ${chalk.cyan('gdm client')} to see available clients.\n`));
+    console.log(chalk.gray(`\n  Run ${chalk.cyan('metrix client')} to see available clients.\n`));
     return;
   }
 
@@ -371,11 +371,11 @@ export async function cleanCommand(options: {
     // No client and no specific flags - interactive mode
     printWarning('No client selected and no specific flags provided.');
     console.log(chalk.gray('\n  Usage examples:'));
-    console.log(chalk.gray(`    ${chalk.cyan('gdm clean --data')}                    Clean data for active client`));
-    console.log(chalk.gray(`    ${chalk.cyan('gdm clean --data --client CLIENT_A')}  Clean data for CLIENT_A`));
-    console.log(chalk.gray(`    ${chalk.cyan('gdm clean --config')}                  Remove active client config`));
-    console.log(chalk.gray(`    ${chalk.cyan('gdm clean --logs')}                    Clean logs for active client`));
-    console.log(chalk.gray(`    ${chalk.cyan('gdm clean --all')}                     Clean everything\n`));
+    console.log(chalk.gray(`    ${chalk.cyan('metrix clean --data')}                    Clean data for active client`));
+    console.log(chalk.gray(`    ${chalk.cyan('metrix clean --data --client CLIENT_A')}  Clean data for CLIENT_A`));
+    console.log(chalk.gray(`    ${chalk.cyan('metrix clean --config')}                  Remove active client config`));
+    console.log(chalk.gray(`    ${chalk.cyan('metrix clean --logs')}                    Clean logs for active client`));
+    console.log(chalk.gray(`    ${chalk.cyan('metrix clean --all')}                     Clean everything\n`));
     return;
   }
 
@@ -449,7 +449,7 @@ export async function cleanCommand(options: {
     }
     
     if (options.all || options.config) {
-      console.log(chalk.gray('\n  Run `gdm init` to set up again.\n'));
+      console.log(chalk.gray('\n  Run `metrix init` to set up again.\n'));
     } else {
       console.log('');
     }

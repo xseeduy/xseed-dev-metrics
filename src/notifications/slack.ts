@@ -381,7 +381,7 @@ export class SlackNotifier {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: '💡 *Suggestion:*\nRun `gdm collect` manually to retry or check repository permissions.',
+        text: '💡 *Suggestion:*\nRun `metrix collect` manually to retry or check repository permissions.',
       },
     });
 

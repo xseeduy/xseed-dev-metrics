@@ -32,7 +32,7 @@ This document describes coding standards, conventions, and patterns that the pro
 - **Handlers**: Command handlers are async where they do I/O or call integrations. Signature: `(pathOrOptions, options) => Promise<void>` or similar as used today.
 - **Common options**: Use the shared `addCommonOptions()` (or equivalent) for Git commands so `--since`, `--until`, `--format`, `--output` behave the same everywhere.
 - **Output**: Use chalk for color and emphasis; use ora for spinners during work. On success, print a short confirmation; on error, print a clear message and call `process.exit(1)`.
-- **Help**: Keep command descriptions and the global help text in `index.ts` accurate so `gdm --help` and `gdm <command> --help` stay useful.
+- **Help**: Keep command descriptions and the global help text in `index.ts` accurate so `metrix --help` and `metrix <command> --help` stay useful.
 
 ## Core (GitMetrics and Types)
 
@@ -68,7 +68,7 @@ This document describes coding standards, conventions, and patterns that the pro
 
 ## Daemon and Scheduler
 
-- **Cron**: Daemon “start” should only install a cron job; do not run a long-lived Node process. Cron command should run `gdm collect --all --quiet` and append to the log file.
+- **Cron**: Daemon “start” should only install a cron job; do not run a long-lived Node process. Cron command should run `metrix collect --all --quiet` and append to the log file.
 - **PID file**: Use only to track “did we install cron?” or similar; document that there is no persistent daemon process.
 - **Logs**: Write daemon-related messages (e.g. collect runs) to the configured log file; avoid logging secrets.
 

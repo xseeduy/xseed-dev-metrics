@@ -2,7 +2,7 @@
 
 ## Overview
 
-By default, `gdm collect` outputs metrics in CSV format for easy import into spreadsheet applications, databases, or data analysis tools.
+By default, `metrix collect` outputs metrics in CSV format for easy import into spreadsheet applications, databases, or data analysis tools.
 
 ## File Naming
 
@@ -131,7 +131,7 @@ If you need JSON format instead:
 
 ```bash
 # Collect in JSON format
-gdm collect --format json
+metrix collect --format json
 
 # Or convert existing CSV to JSON using a tool
 ```

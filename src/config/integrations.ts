@@ -702,7 +702,7 @@ export function saveConfig(config: Partial<ClientConfig>): void {
   const activeClient = fullConfig.activeClient;
   
   if (!activeClient) {
-    throw new Error('No active client. Run `gdm init` to create a client first.');
+    throw new Error('No active client. Run `metrix init` to create a client first.');
   }
   
   // Validate configuration before saving
@@ -796,7 +796,7 @@ export function setSchedulerConfig(schedulerConfig: SchedulerConfig): void {
 export function addRepository(repoPath: string): void {
   const config = getConfig();
   if (!config) {
-    throw new Error('No active client. Run `gdm init` first.');
+    throw new Error('No active client. Run `metrix init` first.');
   }
   
   const repos = config.repositories || [];

@@ -71,7 +71,7 @@ function startDaemon(): { success: boolean; message: string; pid?: number } {
   try {
     const config = getConfig();
     if (!config) {
-      return { success: false, message: 'No configuration found. Run gdm init first.' };
+      return { success: false, message: 'No configuration found. Run metrix init first.' };
     }
     
     const scheduler = config.scheduler;
@@ -215,14 +215,14 @@ export async function daemonCommand(action: string): Promise<void> {
   }
 
   if (!isInitialized()) {
-    printError('Not configured. Run `gdm init` first.');
+    printError('Not configured. Run `metrix init` first.');
     return;
   }
 
   const config = getConfig();
 
   if (!config) {
-    printError('No configuration found. Run gdm init first.');
+    printError('No configuration found. Run metrix init first.');
     return;
   }
 
@@ -232,7 +232,7 @@ export async function daemonCommand(action: string): Promise<void> {
 
       if (!config.scheduler?.enabled) {
         printWarning('Scheduler not enabled in config.');
-        console.log(chalk.gray('  Run `gdm init` to enable the scheduler.\n'));
+        console.log(chalk.gray('  Run `metrix init` to enable the scheduler.\n'));
         return;
       }
 
@@ -310,7 +310,7 @@ export async function daemonCommand(action: string): Promise<void> {
 
     default:
       console.log(chalk.gray(`
-  Usage: gdm daemon <action>
+  Usage: metrix daemon <action>
 
   Actions:
     start   - Start the scheduler daemon (cross-platform)

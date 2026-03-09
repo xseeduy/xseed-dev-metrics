@@ -39,7 +39,7 @@ if (isSubcommand && args[0] !== 'init') {
 }
 
 program
-  .name('gdm')
+  .name('metrix')
   .description('Xseed Developer Metrics - Track productivity across Git, Jira & Linear')
   .version('1.0.0');
 
@@ -90,7 +90,7 @@ program
 // ==========================================
 program
   .command('collect')
-  .description('Collect metrics from configured repositories (default: CSV format, last 7 days)')
+  .description('Collect metrics from configured repositories and upload to Supabase')
   .option('-r, --repo <path>', 'Specific repository to collect from')
   .option('-c, --client <name>', 'Collect for specific client')
   .option('-a, --all', 'Collect from all configured repositories')
@@ -100,7 +100,8 @@ program
   .option('-u, --until <date>', 'End date for metrics (e.g. 2024-12-31)')
   .option('--usernames <list>', 'Collect for specific users (comma-separated) or ALL')
   .option('--jira <project>', 'Include Jira project metrics')
-  .option('-f, --format <type>', 'Output format: csv or json', 'csv')
+  .option('--save', 'Save metrics to a local file')
+  .option('-f, --format <type>', 'Output format when saving: csv or json', 'csv')
   .option('-q, --quiet', 'Minimal output')
   .option('--scheduled', 'Mark as scheduled run (used by cron)')
   .option('--upload', 'Upload metrics to Supabase (auto-enabled for scheduled runs)')
@@ -172,7 +173,7 @@ program
     console.log(chalk.gray('  ' + '─'.repeat(40)));
     
     if (!status.initialized || status.totalClients === 0) {
-      console.log(chalk.yellow('\n  → No clients configured. Run `gdm init` to get started.\n'));
+      console.log(chalk.yellow('\n  → No clients configured. Run `metrix init` to get started.\n'));
       return;
     }
     
@@ -201,9 +202,9 @@ program
     }
     
     console.log(chalk.gray('  Commands:'));
-    console.log(chalk.gray(`    ${chalk.cyan('gdm client')}                List all clients`));
-    console.log(chalk.gray(`    ${chalk.cyan('gdm client:switch <name>')}  Switch active client`));
-    console.log(chalk.gray(`    ${chalk.cyan('gdm collect')}               Collect for active client\n`));
+    console.log(chalk.gray(`    ${chalk.cyan('metrix client')}                List all clients`));
+    console.log(chalk.gray(`    ${chalk.cyan('metrix client:switch <name>')}  Switch active client`));
+    console.log(chalk.gray(`    ${chalk.cyan('metrix collect')}               Collect for active client\n`));
   });
 
 // Common options helper
@@ -296,22 +297,22 @@ program.command('config').description('Manage integration configurations')
 // ==========================================
 program.addHelpText('after', `
 ${chalk.bold('Quick Start:')}
-  ${chalk.cyan('gdm init')}                 Interactive setup wizard
-  ${chalk.cyan('gdm init --force')}         Add another client (when already configured)
-  ${chalk.cyan('gdm collect')}              Collect metrics (CSV format, last 7 days)
-  ${chalk.cyan('gdm collect --format json')} Collect in JSON format
-  ${chalk.cyan('gdm collect -t')}           Collect all-time metrics
-  ${chalk.cyan('gdm show')}                 View collected metrics
-  ${chalk.cyan('gdm daemon start')}         Enable weekly auto-collection
+  ${chalk.cyan('metrix init')}                 Interactive setup wizard
+  ${chalk.cyan('metrix init --force')}         Add another client (when already configured)
+  ${chalk.cyan('metrix collect')}              Collect all-time metrics and upload to Supabase
+  ${chalk.cyan('metrix collect --save')}        Also save metrics to a local file
+  ${chalk.cyan('metrix collect --save --format json')} Save in JSON format
+  ${chalk.cyan('metrix show')}                 View collected metrics
+  ${chalk.cyan('metrix daemon start')}         Enable weekly auto-collection
 
 ${chalk.bold('Git Analysis:')}
-  ${chalk.cyan('gdm summary')}        Repository overview
-  ${chalk.cyan('gdm authors')}        Per-author statistics
-  ${chalk.cyan('gdm report')}         Full report (Git + Jira)
+  ${chalk.cyan('metrix summary')}        Repository overview
+  ${chalk.cyan('metrix authors')}        Per-author statistics
+  ${chalk.cyan('metrix report')}         Full report (Git + Jira)
 
 ${chalk.bold('Integrations:')}
-  ${chalk.cyan('gdm jira -p KEY')}    Jira project metrics
-  ${chalk.cyan('gdm linear -t Team')} Linear team metrics
+  ${chalk.cyan('metrix jira -p KEY')}    Jira project metrics
+  ${chalk.cyan('metrix linear -t Team')} Linear team metrics
 
 ${chalk.bold('Environment Variables:')}
   GDM_GIT_USERNAME, GDM_GIT_EMAIL, GDM_MAIN_BRANCH
@@ -331,7 +332,7 @@ if (args.length === 0) {
     const status = getConfigStatus();
     
     if (status.totalClients === 0) {
-      console.log(chalk.yellow('  → No clients configured. Run `gdm init` to get started\n'));
+      console.log(chalk.yellow('  → No clients configured. Run `metrix init` to get started\n'));
     } else {
       console.log(chalk.gray('  Quick Status:\n'));
       console.log(`    Clients: ${status.totalClients}`);
@@ -347,10 +348,10 @@ if (args.length === 0) {
         console.log(`    Repos: ${activeClient.repositories}`);
       }
       
-      console.log('\n  ' + chalk.gray('Run `gdm --help` for available commands\n'));
+      console.log('\n  ' + chalk.gray('Run `metrix --help` for available commands\n'));
     }
   } else {
-    console.log(chalk.yellow('  → First time? Run `gdm init` to get started\n'));
+    console.log(chalk.yellow('  → First time? Run `metrix init` to get started\n'));
   }
 } else {
   program.parse();

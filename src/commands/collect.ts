@@ -280,17 +280,14 @@ async function collectRepoMetrics(
   const defaultSince = format(new Date(now.getTime() - DEFAULTS.COLLECTION_DAYS * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
   const defaultUntil = format(now, 'yyyy-MM-dd');
 
-  const filterOptions =
-    options.total
-      ? {}
-      : {
-          since: options.since || defaultSince,
-          until: options.until || defaultUntil,
-        };
+  const isAllTime = options.total || (!options.since && !options.until);
+  const filterOptions = isAllTime
+    ? {}
+    : { since: options.since, until: options.until };
   const since = filterOptions.since ?? defaultSince;
   const until = filterOptions.until ?? defaultUntil;
   const period = getPeriodLabel(
-    !!options.total,
+    isAllTime,
     filterOptions.since,
     filterOptions.until,
     defaultSince,
@@ -475,11 +472,10 @@ function saveCollectedData(
   outputFormat: 'json' | 'csv' = 'csv'
 ): string {
   const dataDir = getDataDir(clientName);
-  const dateStr = format(new Date(), 'yyyy-MM-dd');
   const extension = outputFormat === 'json' ? 'json' : 'csv';
   const filename = authorSlug
-    ? `${repoName}_${authorSlug}_${dateStr}.${extension}`
-    : `${repoName}_${dateStr}.${extension}`;
+    ? `${repoName}_${authorSlug}.${extension}`
+    : `${repoName}.${extension}`;
   const filepath = join(dataDir, filename);
 
   data.fileName = filename;
@@ -619,6 +615,7 @@ export async function collectCommand(options: {
   quiet?: boolean;
   scheduled?: boolean;
   upload?: boolean;
+  save?: boolean;
   format?: 'json' | 'csv';
 }): Promise<void> {
   // Detect common mistake: using -authors instead of --usernames
@@ -628,13 +625,13 @@ export async function collectCommand(options: {
     printError(`Invalid parameter: '${authorsFlag}'`);
     console.log(chalk.yellow(`  Did you mean: ${chalk.cyan('--usernames')}?\n`));
     console.log(chalk.gray('  Examples:'));
-    console.log(chalk.gray(`    gdm collect --usernames=user1,user2`));
-    console.log(chalk.gray(`    gdm collect --usernames=ALL\n`));
+    console.log(chalk.gray(`    metrix collect --usernames=user1,user2`));
+    console.log(chalk.gray(`    metrix collect --usernames=ALL\n`));
     return;
   }
 
   if (!isInitialized()) {
-    printError('Not configured. Run `gdm init` first.');
+    printError('Not configured. Run `metrix init` first.');
     return;
   }
 
@@ -642,7 +639,7 @@ export async function collectCommand(options: {
   let clientName = options.client || getActiveClient();
   
   if (!clientName) {
-    printError('No active client. Run `gdm init` to create a client or use --client <name>.');
+    printError('No active client. Run `metrix init` to create a client or use --client <name>.');
     return;
   }
 
@@ -653,7 +650,7 @@ export async function collectCommand(options: {
       switchClient(options.client);
       clientName = options.client;
     } catch (error) {
-      printError(`Client '${options.client}' not found. Run 'gdm client' to see available clients.`);
+      printError(`Client '${options.client}' not found. Run 'metrix client' to see available clients.`);
       return;
     }
   }
@@ -668,7 +665,7 @@ export async function collectCommand(options: {
   const gitConfig = config.git;
 
   if (!gitConfig) {
-    printError(`Git configuration missing for client '${clientName}'. Run 'gdm init' to configure.`);
+    printError(`Git configuration missing for client '${clientName}'. Run 'metrix init' to configure.`);
     return;
   }
 
@@ -740,7 +737,7 @@ export async function collectCommand(options: {
         if (config.repositories?.length) {
           repos = [config.repositories[0]];
         } else {
-          printError('Not a git repository. Run `gdm init` or specify with --repo');
+          printError('Not a git repository. Run `metrix init` or specify with --repo');
           return;
         }
       }
@@ -756,12 +753,10 @@ export async function collectCommand(options: {
   const now = new Date();
   const defaultSince = format(new Date(now.getTime() - DEFAULTS.COLLECTION_DAYS * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
   const defaultUntil = format(now, 'yyyy-MM-dd');
-  const filterOptions = options.total
+  const isAllTimeCollection = options.total || (!options.since && !options.until);
+  const filterOptions = isAllTimeCollection
     ? {}
-    : {
-        since: options.since || defaultSince,
-        until: options.until || defaultUntil,
-      };
+    : { since: options.since, until: options.until };
 
   // ==========================================
   // Supabase Upload Setup
@@ -890,10 +885,12 @@ export async function collectCommand(options: {
           authorOverride: singleUser ? undefined : username,
         });
 
-        const authorSlug = singleUser ? undefined : authorToSlug(username);
-        const outputFormat = options.format || 'csv';
-        const filepath = saveCollectedData(repoName, data, authorSlug, clientName, outputFormat);
-        filesSaved.push(filepath);
+        if (options.save) {
+          const authorSlug = singleUser ? undefined : authorToSlug(username);
+          const outputFormat = options.format || 'csv';
+          const filepath = saveCollectedData(repoName, data, authorSlug, clientName, outputFormat);
+          filesSaved.push(filepath);
+        }
 
         // Upload to Supabase if configured
         if (supabaseClient && supabaseClientId) {
@@ -1039,7 +1036,11 @@ export async function collectCommand(options: {
       }
     }
 
-    console.log(chalk.gray(`\n  Data directory: ${getDataDir(clientName)}\n`));
+    if (options.save) {
+      console.log(chalk.gray(`\n  Data directory: ${getDataDir(clientName)}\n`));
+    } else {
+      console.log('');
+    }
   }
 
   // Restore original client if we switched
@@ -1064,13 +1065,13 @@ export async function showCommand(options: {
   format?: 'table' | 'json';
 }): Promise<void> {
   if (!isInitialized()) {
-    printError('Not configured. Run `gdm init` first.');
+    printError('Not configured. Run `metrix init` first.');
     return;
   }
   
   const clientName = options.client || getActiveClient();
   if (!clientName) {
-    printError('No active client. Use --client <name> or run `gdm init`.');
+    printError('No active client. Use --client <name> or run `metrix init`.');
     return;
   }
   
@@ -1094,7 +1095,7 @@ export async function showCommand(options: {
   const history = loadHistoricalData(repoName, limit, clientName);
   
   if (!history.length) {
-    printWarning(`No data found for ${repoName}. Run \`gdm collect\` first.`);
+    printWarning(`No data found for ${repoName}. Run \`metrix collect\` first.`);
     return;
   }
   

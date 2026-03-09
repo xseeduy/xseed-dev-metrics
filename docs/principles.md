@@ -42,7 +42,7 @@ mindmap
 
 ## Developer Experience (DevEx)
 
-- **First run**: `gdm init` guides setup with sensible defaults and optional steps (e.g. skip Jira/Linear).
+- **First run**: `metrix init` guides setup with sensible defaults and optional steps (e.g. skip Jira/Linear).
 - **Scriptability**: All commands support non-interactive use: options and env vars for init; `-f json`, `-o file` for output; `--quiet` where applicable.
 - **Feedback**: Spinners and clear success/error messages; no silent failures. Use chalk for consistent, readable output.
 - **Performance**: Git operations can be slow on large repos; use spinners and consider future options (e.g. limit history, cache) to keep the tool responsive.
@@ -61,7 +61,7 @@ mindmap
 
 ## Simplicity and Maintainability
 
-- **Single binary/entry**: One CLI (`gdm` / `xseed-metrics`); no separate daemon process—scheduling is done via cron.
+- **Single binary/entry**: One CLI (`metrix` / `xseed-metrics`); no separate daemon process—scheduling is done via cron.
 - **Layered architecture**: Clear separation between CLI, commands, core, config, integrations, and output so that changes are localized (see [Architecture](architecture.md)).
 - **Consistent integration pattern**: Each external system (Jira, Linear) follows the same structure (client, metrics, types); new integrations follow the same pattern.
 - **Minimal dependencies**: Use a small set of well-known dependencies (Commander, chalk, date-fns, etc.); avoid unnecessary abstractions.
