@@ -29,7 +29,7 @@ npm run build
 npm link
 
 # Verify installation
-gdm --version
+metrix --version
 ```
 
 ### Windows Installation
@@ -45,7 +45,7 @@ gdm --version
 3. Follow the standard installation steps above
 
 **Important Notes:**
-- Always use **Git Bash** terminal when running `gdm` commands on Windows
+- Always use **Git Bash** terminal when running `metrix` commands on Windows
 - Alternatively, use **WSL (Windows Subsystem for Linux)** for native Linux compatibility
 - The scheduler daemon uses node-cron (cross-platform) instead of system cron
 
@@ -59,7 +59,7 @@ gdm --version
 Run the interactive setup wizard:
 
 ```bash
-gdm init
+metrix init
 ```
 
 This will guide you through:
@@ -75,7 +75,7 @@ For CI/CD or scripted environments:
 
 ```bash
 # Using command line options
-gdm init --username "John Doe" --email "john@company.com" --branch main --repo /path/to/repo
+metrix init --username "John Doe" --email "john@company.com" --branch main --repo /path/to/repo
 
 # Using environment variables
 export GDM_GIT_USERNAME="John Doe"
@@ -93,21 +93,21 @@ export LINEAR_API_KEY="lin_api_xxxxx"
 
 | Command | Description |
 |---------|-------------|
-| `gdm init` | Interactive setup wizard (add/update client) |
-| `gdm init --force` | Add a new client (when already configured) |
-| `gdm collect` | Collect metrics from repositories (CSV format, last 7 days) |
-| `gdm show` | View collected historical metrics |
-| `gdm status` | Show configuration status |
-| `gdm daemon start` | Enable automatic weekly collection |
-| `gdm clean` | Delete configuration and/or data |
+| `metrix init` | Interactive setup wizard (add/update client) |
+| `metrix init --force` | Add a new client (when already configured) |
+| `metrix collect` | Collect metrics from repositories (CSV format, last 7 days) |
+| `metrix show` | View collected historical metrics |
+| `metrix status` | Show configuration status |
+| `metrix daemon start` | Enable automatic weekly collection |
+| `metrix clean` | Delete configuration and/or data |
 
 ### Client Management Commands
 
 | Command | Description |
 |---------|-------------|
-| `gdm client` | List all configured clients |
-| `gdm client:switch <name>` | Switch active client |
-| `gdm client:remove <name>` | Remove a client |
+| `metrix client` | List all configured clients |
+| `metrix client:switch <name>` | Switch active client |
+| `metrix client:remove <name>` | Remove a client |
 
 ## 👥 Managing Multiple Clients
 
@@ -118,7 +118,7 @@ The CLI supports managing multiple clients (organizations/projects) with separat
 **First time setup:**
 
 ```bash
-gdm init
+metrix init
 ```
 
 **Adding another client (when already configured):**
@@ -127,7 +127,7 @@ If you navigate to a different repository and want to add a new client, use the 
 
 ```bash
 cd /path/to/different/repository
-gdm init --force
+metrix init --force
 ```
 
 The wizard will guide you through:
@@ -143,7 +143,7 @@ If a client with that name already exists, you'll be asked if you want to reconf
 Set which client is active (used for collect, status, etc.):
 
 ```bash
-gdm client:switch CLIENT_B
+metrix client:switch CLIENT_B
 ```
 
 ### Listing All Clients
@@ -151,7 +151,7 @@ gdm client:switch CLIENT_B
 View all configured clients and their status:
 
 ```bash
-gdm client
+metrix client
 ```
 
 Output example:
@@ -169,15 +169,15 @@ Output example:
 
 ### Collecting for a Specific Client
 
-By default, `gdm collect` uses the active client. To collect for a different client:
+By default, `metrix collect` uses the active client. To collect for a different client:
 
 ```bash
-gdm collect --client CLIENT_B
+metrix collect --client CLIENT_B
 ```
 
 ### Repository Ownership
 
-When you run `gdm collect` in an unconfigured repository, you'll be prompted:
+When you run `metrix collect` in an unconfigured repository, you'll be prompted:
 
 ```
 Repository not configured: /path/to/repo
@@ -186,15 +186,15 @@ Repository not configured: /path/to/repo
 
 Repositories can belong to multiple clients if needed (useful for shared libraries).
 
-**What `gdm collect` does:** pulls the latest from the repo, gathers Git metrics (commits, lines, activity, trends) for the configured user, optionally Jira metrics, and saves a snapshot to `~/.xseed-metrics/data/`. By default it collects **from 7 days ago until today** (last week) and saves in **CSV format**. You can change the range and format:
+**What `metrix collect` does:** pulls the latest from the repo, gathers Git metrics (commits, lines, activity, trends) for the configured user, optionally Jira metrics, and saves a snapshot to `~/.xseed-metrics/data/`. By default it collects **from 7 days ago until today** (last week) and saves in **CSV format**. You can change the range and format:
 
 ```bash
-gdm collect                    # Last 7 days, CSV format (default)
-gdm collect --format json      # Output as JSON instead of CSV
-gdm collect -t                 # All time (--total)
-gdm collect --since="30 days ago" # Last 30 days
-gdm collect --since=2024-01-01 # From a start date until today
-gdm collect -s 2024-01-01 -u 2024-12-31  # Custom range (--since / --until)
+metrix collect                    # Last 7 days, CSV format (default)
+metrix collect --format json      # Output as JSON instead of CSV
+metrix collect -t                 # All time (--total)
+metrix collect --since="30 days ago" # Last 30 days
+metrix collect --since=2024-01-01 # From a start date until today
+metrix collect -s 2024-01-01 -u 2024-12-31  # Custom range (--since / --until)
 ```
 
 **Output Formats:**
@@ -204,32 +204,32 @@ gdm collect -s 2024-01-01 -u 2024-12-31  # Custom range (--since / --until)
 **Collect per user (separate files):** use `--usernames` to collect metrics for specific authors or all authors. Each user gets a separate file (e.g. `repo_John_Doe_2024-01-15.csv`).
 
 ```bash
-gdm collect --usernames="John Doe,Jane Doe"           # Specific users
-gdm collect --usernames=ALL                           # All authors in the repo
-gdm collect --usernames="John Doe,Jane Doe" --since=2024-01-01  # With date range
+metrix collect --usernames="John Doe,Jane Doe"           # Specific users
+metrix collect --usernames=ALL                           # All authors in the repo
+metrix collect --usernames="John Doe,Jane Doe" --since=2024-01-01  # With date range
 ```
 
 ### Git Analysis
 
 | Command | Description |
 |---------|-------------|
-| `gdm summary [path]` | Repository summary statistics |
-| `gdm authors [path]` | Per-author statistics |
-| `gdm commits [path]` | List commits with statistics |
-| `gdm activity [path]` | Activity patterns (by hour, day) |
-| `gdm files [path]` | Most frequently changed files |
-| `gdm trends [path]` | Activity trends over time |
-| `gdm blame [path]` | Code ownership statistics |
-| `gdm types [path]` | Statistics by file type |
-| `gdm report [path]` | Comprehensive report |
+| `metrix summary [path]` | Repository summary statistics |
+| `metrix authors [path]` | Per-author statistics |
+| `metrix commits [path]` | List commits with statistics |
+| `metrix activity [path]` | Activity patterns (by hour, day) |
+| `metrix files [path]` | Most frequently changed files |
+| `metrix trends [path]` | Activity trends over time |
+| `metrix blame [path]` | Code ownership statistics |
+| `metrix types [path]` | Statistics by file type |
+| `metrix report [path]` | Comprehensive report |
 
 ### Integrations
 
 | Command | Description |
 |---------|-------------|
-| `gdm jira -p PROJECT` | Jira project metrics |
-| `gdm linear -t TEAM` | Linear team metrics |
-| `gdm config --test` | Test integration connections |
+| `metrix jira -p PROJECT` | Jira project metrics |
+| `metrix linear -t TEAM` | Linear team metrics |
+| `metrix config --test` | Test integration connections |
 
 ## ⏰ Automatic Collection
 
@@ -241,19 +241,19 @@ The daemon runs in the background and automatically:
 
 ```bash
 # Start automatic collection (weekly on Monday at 9am)
-gdm daemon start
+metrix daemon start
 
 # Check scheduler status
-gdm daemon status
+metrix daemon status
 
 # View logs
-gdm daemon logs
+metrix daemon logs
 
 # Stop scheduler
-gdm daemon stop
+metrix daemon stop
 
 # Run collection immediately
-gdm daemon run
+metrix daemon run
 ```
 
 ## 🔧 Configuration
@@ -396,15 +396,15 @@ Each client has its own isolated data and logs directories.
 
 ### Selective Cleaning
 
-The `gdm clean` command supports selective cleaning of specific resources:
+The `metrix clean` command supports selective cleaning of specific resources:
 
 #### Clean Data Only
 
 Remove collected metrics while keeping configuration:
 
 ```bash
-gdm clean --data                      # Clean active client's data
-gdm clean --data --client CLIENT_A    # Clean specific client's data
+metrix clean --data                      # Clean active client's data
+metrix clean --data --client CLIENT_A    # Clean specific client's data
 ```
 
 #### Clean Logs Only
@@ -412,8 +412,8 @@ gdm clean --data --client CLIENT_A    # Clean specific client's data
 Remove log files:
 
 ```bash
-gdm clean --logs                      # Clean active client's logs
-gdm clean --logs --client CLIENT_B    # Clean specific client's logs
+metrix clean --logs                      # Clean active client's logs
+metrix clean --logs --client CLIENT_B    # Clean specific client's logs
 ```
 
 #### Clean Configuration Only
@@ -421,8 +421,8 @@ gdm clean --logs --client CLIENT_B    # Clean specific client's logs
 Remove client configuration (keeps data and logs):
 
 ```bash
-gdm clean --config                    # Remove active client config
-gdm clean --config --client CLIENT_A  # Remove specific client config
+metrix clean --config                    # Remove active client config
+metrix clean --config --client CLIENT_A  # Remove specific client config
 ```
 
 #### Clean Everything
@@ -430,8 +430,8 @@ gdm clean --config --client CLIENT_A  # Remove specific client config
 Remove all configuration, data, and logs:
 
 ```bash
-gdm clean --all                       # Requires confirmation
-gdm clean --all --yes                 # Skip confirmation
+metrix clean --all                       # Requires confirmation
+metrix clean --all --yes                 # Skip confirmation
 ```
 
 #### Combined Cleaning
@@ -439,8 +439,8 @@ gdm clean --all --yes                 # Skip confirmation
 Mix flags for custom cleanup:
 
 ```bash
-gdm clean --data --logs               # Clean data and logs for active client
-gdm clean --data --config --client CLIENT_A  # Remove CLIENT_A entirely
+metrix clean --data --logs               # Clean data and logs for active client
+metrix clean --data --config --client CLIENT_A  # Remove CLIENT_A entirely
 ```
 
 #### Removing a Client
@@ -448,8 +448,8 @@ gdm clean --data --config --client CLIENT_A  # Remove CLIENT_A entirely
 To completely remove a client and all its data:
 
 ```bash
-gdm client:remove CLIENT_A            # Removes config only (prompts for confirmation)
-gdm clean --config --data --logs --client CLIENT_A  # Removes everything
+metrix client:remove CLIENT_A            # Removes config only (prompts for confirmation)
+metrix clean --config --data --logs --client CLIENT_A  # Removes everything
 ```
 
 ⚠️ **Warning**: Cleaning operations are permanent and cannot be undone. The command will prompt for confirmation unless `--yes` is used.
@@ -458,22 +458,22 @@ gdm clean --config --data --logs --client CLIENT_A  # Removes everything
 
 ```bash
 # 1. Initial setup
-gdm init
+metrix init
 
 # 2. Collect metrics now
-gdm collect
+metrix collect
 
 # 3. View your stats
-gdm show
+metrix show
 
 # 4. Generate a report
-gdm report -f markdown -o weekly-report.md
+metrix report -f markdown -o weekly-report.md
 
 # 5. Enable weekly auto-collection
-gdm daemon start
+metrix daemon start
 
 # 6. Check scheduler status
-gdm daemon status
+metrix daemon status
 ```
 
 ## 📋 Output Formats
@@ -482,16 +482,16 @@ All commands support multiple output formats:
 
 ```bash
 # Table (default, for terminal)
-gdm authors
+metrix authors
 
 # JSON (for processing)
-gdm authors -f json
+metrix authors -f json
 
 # CSV (for spreadsheets)
-gdm authors -f csv -o authors.csv
+metrix authors -f csv -o authors.csv
 
 # Markdown (for documentation)
-gdm report -f markdown -o report.md
+metrix report -f markdown -o report.md
 ```
 
 ## 🏢 For Staff Augmentation
