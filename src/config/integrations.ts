@@ -258,11 +258,11 @@ function getEnvConfigOverrides(): Partial<ClientConfig> {
   const config: Partial<ClientConfig> = {};
   
   // Git from env
-  if (process.env.GDM_GIT_USERNAME || process.env.GDM_GIT_EMAIL) {
+  if (process.env.METRIX_GIT_USERNAME || process.env.METRIX_GIT_EMAIL) {
     config.git = {
-      username: process.env.GDM_GIT_USERNAME || '',
-      email: process.env.GDM_GIT_EMAIL || '',
-      mainBranch: process.env.GDM_MAIN_BRANCH || 'main',
+      username: process.env.METRIX_GIT_USERNAME || '',
+      email: process.env.METRIX_GIT_EMAIL || '',
+      mainBranch: process.env.METRIX_MAIN_BRANCH || 'main',
     };
   }
 

@@ -32,7 +32,7 @@
   - Per-client data: `~/.xseed-metrics/data/CLIENT_NAME/`
   - Per-client logs: `~/.xseed-metrics/logs/CLIENT_NAME/`
 - **Client management**: Commands to list, switch, and remove clients (`metrix client`, `metrix client:switch`, `metrix client:remove`)
-- **Environment variables** override file config: `GDM_GIT_USERNAME`, `GDM_GIT_EMAIL`, `GDM_MAIN_BRANCH`, `JIRA_*`, `LINEAR_API_KEY`.
+- **Environment variables** override file config: `METRIX_GIT_USERNAME`, `METRIX_GIT_EMAIL`, `METRIX_MAIN_BRANCH`, `JIRA_*`, `LINEAR_API_KEY`.
 
 ## Commands Summary
 

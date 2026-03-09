@@ -315,7 +315,7 @@ ${chalk.bold('Integrations:')}
   ${chalk.cyan('metrix linear -t Team')} Linear team metrics
 
 ${chalk.bold('Environment Variables:')}
-  GDM_GIT_USERNAME, GDM_GIT_EMAIL, GDM_MAIN_BRANCH
+  METRIX_GIT_USERNAME, METRIX_GIT_EMAIL, METRIX_MAIN_BRANCH
   JIRA_URL, JIRA_EMAIL, JIRA_TOKEN
   LINEAR_API_KEY
   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY

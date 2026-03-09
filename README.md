@@ -78,9 +78,9 @@ For CI/CD or scripted environments:
 metrix init --username "John Doe" --email "john@company.com" --branch main --repo /path/to/repo
 
 # Using environment variables
-export GDM_GIT_USERNAME="John Doe"
-export GDM_GIT_EMAIL="john@company.com"
-export GDM_MAIN_BRANCH="main"
+export METRIX_GIT_USERNAME="John Doe"
+export METRIX_GIT_EMAIL="john@company.com"
+export METRIX_MAIN_BRANCH="main"
 export JIRA_URL="https://company.atlassian.net"
 export JIRA_EMAIL="john@company.com"
 export JIRA_TOKEN="your_api_token"
@@ -304,9 +304,9 @@ Configuration is stored in `~/.xseed-metrics/config.json`:
 
 | Variable | Description |
 |----------|-------------|
-| `GDM_GIT_USERNAME` | Git username for filtering |
-| `GDM_GIT_EMAIL` | Git email for filtering |
-| `GDM_MAIN_BRANCH` | Default branch (main/master) |
+| `METRIX_GIT_USERNAME` | Git username for filtering |
+| `METRIX_GIT_EMAIL` | Git email for filtering |
+| `METRIX_MAIN_BRANCH` | Default branch (main/master) |
 | `JIRA_URL` | Jira instance URL |
 | `JIRA_EMAIL` | Jira account email |
 | `JIRA_TOKEN` | Jira API token |
