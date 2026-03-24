@@ -808,7 +808,15 @@ export async function collectCommand(options: {
     if (usernamesOption.type === 'none') {
       usersToCollect = [gitConfig.username];
     } else if (usernamesOption.type === 'all') {
-      usersToCollect = getAuthorsInRepo(repoPath, filterOptions);
+      const trackedEngineers = config?.engineers;
+      if (trackedEngineers && trackedEngineers.length > 0) {
+        usersToCollect = trackedEngineers.map(e => e.fullName);
+        if (!options.quiet) {
+          console.log(chalk.gray(`  Using ${usersToCollect.length} configured engineer(s) from config.`));
+        }
+      } else {
+        usersToCollect = getAuthorsInRepo(repoPath, filterOptions);
+      }
       if (!usersToCollect.length && !options.quiet) {
         printWarning(`No authors found in ${repoName}.`);
         continue;
