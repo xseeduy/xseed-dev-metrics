@@ -1,10 +1,9 @@
 {
-  "name": "xseed-dev-metrics",
+  "name": "METRIX",
   "version": "1.0.0",
   "description": "Xseed Developer Metrics CLI - Track productivity across Git, Jira & Linear",
   "main": "dist/index.js",
   "bin": {
-    "xseed-metrics": "./dist/index.js",
     "metrix": "./dist/index.js"
   },
   "scripts": {
@@ -19,9 +18,6 @@
   },
   "keywords": [
     "xseed",
-    "git",
-    "jira",
-    "linear",
     "metrics",
     "developer",
     "productivity",
@@ -32,6 +28,7 @@
   "author": "Xseed Solutions",
   "license": "MIT",
   "dependencies": {
+    "@inquirer/prompts": "^8.3.2",
     "@supabase/supabase-js": "^2.95.3",
     "chalk": "^4.1.2",
     "cli-table3": "^0.6.5",
