@@ -343,8 +343,6 @@ if (args.length === 0) {
         console.log(`    Git: ${activeClient.git.configured ? chalk.green(activeClient.git.username) : chalk.yellow('Not configured')}`);
         console.log(`    Jira: ${activeClient.jira.configured ? chalk.green('Connected') : chalk.gray('Not connected')}`);
         console.log(`    Linear: ${activeClient.linear.configured ? chalk.green('Connected') : chalk.gray('Not connected')}`);
-        console.log(`    Supabase: ${activeClient.supabase.configured ? chalk.green('Connected') : chalk.gray('Not connected')}`);
-        console.log(`    Slack: ${activeClient.slack.configured ? chalk.green('Connected') : chalk.gray('Not connected')}`);
         console.log(`    Repos: ${activeClient.repositories}`);
       }
       

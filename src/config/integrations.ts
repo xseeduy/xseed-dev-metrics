@@ -129,6 +129,8 @@ export interface ClientConfig {
   repositories: string[];
   /** Discovered engineer profiles */
   engineers?: EngineerProfile[];
+  /** Slack user ID of the leader running the tool — receives upload notifications */
+  notifySlackUser?: string;
   /** ISO date of last scheduled run */
   lastRun?: string;
 }
