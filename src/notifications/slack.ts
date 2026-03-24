@@ -229,8 +229,7 @@ export class SlackNotifier {
     channel: string | undefined,
     summary: {
       clientName: string;
-      reposProcessed: number;
-      usersCollected: number;
+      repos: Array<{ name: string; branch: string; users: string[] }>;
       uploadedToSupabase: boolean;
       errors: string[];
       trigger: 'manual' | 'scheduled';
@@ -242,45 +241,53 @@ export class SlackNotifier {
     }
 
     const hasErrors = summary.errors.length > 0;
-    const status = hasErrors ? 'Partial (with errors)' : 'Success';
     const statusEmoji = hasErrors ? ':warning:' : ':white_check_mark:';
+    const statusLabel = hasErrors ? 'Completed with errors' : 'Completed successfully';
     const triggerLabel = summary.trigger === 'scheduled' ? 'Scheduled' : 'Manual';
+    const uploadLabel = summary.uploadedToSupabase ? ':cloud: Uploaded' : ':floppy_disk: Saved locally';
 
-    const text = `Metrics collection ${status.toLowerCase()} for ${summary.clientName}`;
+    const text = `Metrics collection for *${summary.clientName}* — ${statusLabel}`;
 
     const blocks: any[] = [
       {
         type: 'header',
-        text: { type: 'plain_text', text: `${statusEmoji} Metrics Collection ${status}` },
+        text: { type: 'plain_text', text: `${statusEmoji} Metrics Collection — ${summary.clientName}` },
       },
       {
         type: 'section',
         fields: [
-          { type: 'mrkdwn', text: `*Client:*\n${summary.clientName}` },
           { type: 'mrkdwn', text: `*Trigger:*\n${triggerLabel}` },
-          { type: 'mrkdwn', text: `*Repos:*\n${summary.reposProcessed}` },
-          { type: 'mrkdwn', text: `*Users:*\n${summary.usersCollected}` },
+          { type: 'mrkdwn', text: `*Upload:*\n${uploadLabel}` },
         ],
       },
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: summary.uploadedToSupabase
-            ? ':cloud: Uploaded to Supabase'
-            : ':file_folder: Saved locally only',
-        },
-      },
+      { type: 'divider' },
     ];
 
-    if (hasErrors) {
+    // One section per repo
+    for (const repo of summary.repos) {
+      const devList = repo.users.length > 0
+        ? repo.users.map(u => `• ${u}`).join('\n')
+        : '_none_';
       blocks.push({
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: `*Errors:*\n${summary.errors.map(e => `- ${e}`).join('\n')}`,
+          text: `*:file_folder: ${repo.name}*  \`${repo.branch}\`\n${devList}`,
         },
       });
+    }
+
+    if (hasErrors) {
+      blocks.push(
+        { type: 'divider' },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*:x: Errors:*\n${summary.errors.map(e => `• ${e}`).join('\n')}`,
+          },
+        }
+      );
     }
 
     return this.sendMessage(targetChannel, text, blocks);

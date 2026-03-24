@@ -792,7 +792,9 @@ export async function collectCommand(options: {
     repo: string;
     success: boolean;
     files?: string[];
-    error?: string
+    error?: string;
+    users?: string[];
+    branch?: string;
   }> = [];
 
   for (const repoPath of repos) {
@@ -946,10 +948,12 @@ export async function collectCommand(options: {
         }
       }
 
-      results.push({ 
-        repo: repoName, 
+      results.push({
+        repo: repoName,
         success: true,
         files: filesSaved,
+        users: usersToCollect,
+        branch: gitConfig.mainBranch,
       });
 
       spinner.succeed(
@@ -994,14 +998,17 @@ export async function collectCommand(options: {
   // Slack notification (best-effort)
   // ==========================================
   const slackConfig = getSlackConfig();
-  if (slackConfig && !options.quiet) {
+  if (slackConfig && config.notifySlackUser && !options.quiet) {
     try {
       const { SlackNotifier } = await import('../notifications/slack');
       const notifier = new SlackNotifier(slackConfig);
-      await notifier.sendCollectionSummary(undefined, {
+      await notifier.sendCollectionSummary(config.notifySlackUser, {
         clientName,
-        reposProcessed: results.filter(r => r.success).length,
-        usersCollected: results.reduce((sum, r) => sum + (r.files?.length || 0), 0),
+        repos: results.filter(r => r.success).map(r => ({
+          name: r.repo,
+          branch: r.branch || gitConfig.mainBranch,
+          users: r.users || [],
+        })),
         uploadedToSupabase: uploadCount > 0,
         errors: [
           ...results.filter(r => !r.success).map(r => `${r.repo}: ${r.error}`),
