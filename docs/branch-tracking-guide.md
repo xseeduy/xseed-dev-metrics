@@ -419,14 +419,3 @@ git stale             # Find branches inactive > 60 days
 
 ---
 
-## Next Steps for Your Project
-
-Consider adding branch tracking features to your `xseed-dev-metrics` CLI:
-
-1. **Branch Analysis Module**: Create `src/git/branches.ts` for branch operations
-2. **New Commands**: Add `branches`, `branch-compare`, `branch-activity` commands
-3. **CSV Export**: Include branch metrics in your data collection
-4. **Dashboard Integration**: Show branch activity in reports
-5. **Alerting**: Notify about stale branches or branches diverging significantly
-
-Would you like me to implement any of these features in your CLI tool?

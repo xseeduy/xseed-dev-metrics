@@ -217,7 +217,7 @@ done
 
 ## Integration with Your CLI Tool
 
-Your `xseed-dev-metrics` CLI could be enhanced with branch tracking:
+Your `metrix` CLI could be enhanced with branch tracking:
 
 ### Proposed Commands
 

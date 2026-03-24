@@ -150,7 +150,7 @@ git branches    # All branches with dates
 
 ## Integration with Your CLI Tool
 
-Your `xseed-dev-metrics` tool already has the foundation. Consider adding:
+Your `metrix` tool already has the foundation. Consider adding:
 
 ### New Commands
 
