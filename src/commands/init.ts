@@ -4,6 +4,7 @@
 
 import chalk from 'chalk';
 import * as readline from 'readline';
+import { checkbox } from '@inquirer/prompts';
 import { execSync } from 'child_process';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
@@ -263,7 +264,7 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
   // Show welcome
   printWelcome();
   
-  const rl = createRL();
+  let rl = createRL();
   
   try {
     // ==========================================
@@ -397,77 +398,80 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
           );
         });
 
-        console.log(chalk.gray('\n  For each engineer, enter their Slack User ID:\n'));
-        console.log(chalk.gray('  💡 To get a Slack User ID: Click their profile → ⋮ (More) → Copy member ID\n'));
-        console.log(chalk.gray('  Format: U12345678 (starts with U followed by 8-11 characters)\n'));
-
-        // Initialize Slack notifier for validation
-        const slackConfig = getSlackConfig();
-        const slackNotifier = slackConfig ? new SlackNotifier(slackConfig) : null;
-
-        for (const eng of engineers) {
-          let validated = false;
-          
-          while (!validated) {
-            const slackUser = await ask(rl, `${eng.email} (${eng.fullName})`);
-            
-            if (!slackUser) {
-              // Allow skip
-              printWarning('Slack user ID is optional but recommended for notifications.');
-              const confirmSkip = await askYesNo(rl, 'Skip this engineer?', false);
-              if (confirmSkip) {
-                validated = true; // Exit loop without setting slackUser
-                break;
-              }
-              continue; // Ask again
-            }
-            
-            // Remove @ prefix if present and validate format
-            const userId = slackUser.startsWith('@') ? slackUser.substring(1) : slackUser;
-            
-            // First validate format
-            const formatValidation = validateSlackUserId(userId);
-            if (!formatValidation.valid) {
-              printError(formatValidation.error || 'Invalid format');
-              console.log(chalk.gray('  Please try again or press Enter to skip\n'));
-              continue;
-            }
-            
-            // Then validate with Slack API if notifier is available
-            if (slackNotifier) {
-              console.log(chalk.gray('  Validating user ID and sending welcome message...'));
-              
-              const validation = await slackNotifier.validateAndSendWelcome(
-                userId,
-                eng.fullName,
-                eng.email,
-                clientName
-              );
-              
-              if (validation.success) {
-                console.log(chalk.green(`  ✓ Validated! Welcome message sent to ${validation.displayName}\n`));
-                eng.slackUser = userId;
-                validated = true;
-              } else {
-                printError(`Invalid user ID: ${validation.error}`);
-                console.log(chalk.gray('  Please try again or press Enter to skip\n'));
-              }
-            } else {
-              // If no Slack config, just save the formatted ID
-              eng.slackUser = userId;
-              validated = true;
-            }
+        // Multi-select: which engineers to track
+        if (engineers.length > 1) {
+          console.log();
+          // Close rl before inquirer takes over stdin, then recreate it after
+          rl.close();
+          const selected = await checkbox({
+            message: 'Select engineers to track for metrics',
+            choices: engineers.map(eng => ({
+              name: `${eng.fullName} <${eng.email}>`,
+              value: eng,
+              checked: true,
+            })),
+          });
+          // Recreate readline after inquirer releases stdin
+          rl = createRL();
+          if (selected.length > 0 && selected.length < engineers.length) {
+            engineers = selected;
+            printSuccess(`Tracking ${engineers.length} engineer(s).`);
           }
         }
+
       } else {
         console.log(chalk.gray('  No engineers found in repository history.\n'));
       }
     }
 
     // ==========================================
-    // Step 5: Jira Integration (Optional)
+    // Step 5: Your Slack Notification
     // ==========================================
-    printSection('Step 5: Jira Integration (Optional)');
+    printSection('Step 5: Your Slack Notification');
+    console.log(chalk.gray('  Your Slack User ID — you\'ll be notified when a collection upload succeeds or fails.'));
+    console.log(chalk.gray('  💡 To find it: Click your Slack profile → ⋮ (More) → Copy member ID'));
+    console.log(chalk.gray('  Format: U12345678\n'));
+
+    let notifySlackUser: string | undefined;
+    while (!notifySlackUser) {
+      const slackInput = await ask(rl, 'Your Slack User ID');
+
+      if (!slackInput) {
+        printWarning('Slack User ID is required.');
+        continue;
+      }
+
+      const userId = slackInput.startsWith('@') ? slackInput.substring(1) : slackInput;
+      const formatValidation = validateSlackUserId(userId);
+
+      if (!formatValidation.valid) {
+        printError(formatValidation.error || 'Invalid format');
+        console.log(chalk.gray('  Please try again.\n'));
+        continue;
+      }
+
+      const slackConfig = getSlackConfig();
+      if (slackConfig) {
+        console.log(chalk.gray('  Validating your Slack user ID...'));
+        const slackNotifier = new SlackNotifier(slackConfig);
+        const validation = await slackNotifier.validateAndSendWelcome(userId, gitUsername || gitEmail, gitEmail, clientName);
+
+        if (validation.success) {
+          console.log(chalk.green(`  ✓ Validated! You're set up as ${validation.displayName}\n`));
+          notifySlackUser = userId;
+        } else {
+          printError(`Invalid user ID: ${validation.error}`);
+          console.log(chalk.gray('  Please try again.\n'));
+        }
+      } else {
+        notifySlackUser = userId;
+      }
+    }
+
+    // ==========================================
+    // Step 6: Jira Integration (Optional)
+    // ==========================================
+    printSection('Step 6: Jira Integration (Optional)');
     console.log(chalk.gray('  Connect to Atlassian Jira for additional metrics.\n'));
     
     const configureJira = await askYesNo(rl, 'Configure Jira integration?', false);
@@ -502,9 +506,9 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     }
     
     // ==========================================
-    // Step 6: Linear Integration (Optional)
+    // Step 7: Linear Integration (Optional)
     // ==========================================
-    printSection('Step 6: Linear Integration (Optional)');
+    printSection('Step 7: Linear Integration (Optional)');
     console.log(chalk.gray('  Connect to Linear for issue tracking metrics.\n'));
     
     const configureLinear = await askYesNo(rl, 'Configure Linear integration?', false);
@@ -537,9 +541,9 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     }
     
     // ==========================================
-    // Step 7: Scheduler (Optional)
+    // Step 8: Scheduler (Optional)
     // ==========================================
-    printSection('Step 7: Automatic Collection (Optional)');
+    printSection('Step 8: Automatic Collection (Optional)');
     console.log(chalk.gray('  Schedule automatic metric collection.\n'));
     
     const enableScheduler = await askYesNo(rl, 'Enable weekly automatic collection?', true);
@@ -565,6 +569,7 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
       linear: linearConfig,
       repositories,
       engineers: engineers.length > 0 ? engineers : undefined,
+      notifySlackUser: notifySlackUser,
       scheduler: {
         enabled: enableScheduler,
         interval: 'weekly',
