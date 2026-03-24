@@ -130,11 +130,11 @@ export class SlackNotifier {
       const displayName = user.profile?.display_name || user.profile?.real_name || user.real_name || user.name;
 
       // Send welcome message
-      const welcomeText = `👋 Welcome to xseed-dev-metrics!`;
+      const welcomeText = `👋 Welcome to Metrix!`;
       const blocks = [
         {
           type: 'header',
-          text: { type: 'plain_text', text: '👋 Welcome to xseed-dev-metrics!' },
+          text: { type: 'plain_text', text: `${welcomeText}` },
         },
         {
           type: 'section',
