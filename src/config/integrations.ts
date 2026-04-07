@@ -98,6 +98,18 @@ export interface SchedulerConfig {
 export type GitProvider = 'github' | 'gitlab' | 'bitbucket';
 
 /**
+ * Git provider integration configuration.
+ * Stores the token required to call the provider's PR/MR API.
+ * The API base URL is always derived automatically from the repository's remote URL.
+ */
+export interface GitIntegrationConfig {
+  /** Git provider */
+  provider: GitProvider;
+  /** Personal access token / app password for the provider's API */
+  token: string;
+}
+
+/**
  * Engineer profile discovered from git history during init.
  */
 export interface EngineerProfile {
@@ -115,6 +127,8 @@ export interface EngineerProfile {
 export interface ClientConfig {
   /** Git configuration */
   git?: GitConfig;
+  /** Git provider integration (token for PR/MR API) */
+  gitIntegration?: GitIntegrationConfig;
   /** Jira configuration */
   jira?: JiraConfig;
   /** Linear configuration */
@@ -162,6 +176,8 @@ export interface ClientStatus {
   repositories: number;
   /** Git configuration status */
   git: { configured: boolean; username?: string; email?: string; mainBranch?: string };
+  /** Git provider integration status */
+  gitIntegration: { configured: boolean; provider?: GitProvider };
   /** Jira configuration status */
   jira: { configured: boolean; url?: string; email?: string };
   /** Linear configuration status */
@@ -298,6 +314,15 @@ function getEnvConfigOverrides(): Partial<ClientConfig> {
     };
   }
 
+  // Git provider integration from env
+  const envProvider = process.env.METRIX_GIT_PROVIDER as GitProvider | undefined;
+  if (envProvider && process.env.METRIX_GIT_TOKEN) {
+    config.gitIntegration = {
+      provider: envProvider,
+      token: process.env.METRIX_GIT_TOKEN,
+    };
+  }
+
   return config;
 }
 
@@ -350,6 +375,7 @@ export function getConfig(): ClientConfig | null {
   return {
     ...clientConfig,
     git: envOverrides.git || clientConfig.git,
+    gitIntegration: envOverrides.gitIntegration || clientConfig.gitIntegration,
     jira: envOverrides.jira || clientConfig.jira,
     linear: envOverrides.linear || clientConfig.linear,
     supabase: envOverrides.supabase || clientConfig.supabase,
@@ -399,6 +425,19 @@ export function getLinearConfig(): LinearConfig | null {
   const config = getConfig();
   if (!config) return null;
   return config.linear?.apiKey ? config.linear : null;
+}
+
+/**
+ * Gets git provider integration configuration for active client if properly configured.
+ *
+ * @returns GitIntegrationConfig or null if not properly configured
+ */
+export function getGitIntegrationConfig(): GitIntegrationConfig | null {
+  const config = getConfig();
+  if (!config) return null;
+  return config.gitIntegration?.provider && config.gitIntegration?.token
+    ? config.gitIntegration
+    : null;
 }
 
 /**
@@ -540,6 +579,10 @@ export function getConfigStatus(): ConfigStatus {
             username: config.git?.username,
             email: config.git?.email,
             mainBranch: config.git?.mainBranch,
+          },
+          gitIntegration: {
+            configured: !!(config.gitIntegration?.provider && config.gitIntegration?.token),
+            provider: config.gitIntegration?.provider,
           },
           jira: {
             configured: !!(config.jira?.url && config.jira?.token),

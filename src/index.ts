@@ -55,6 +55,8 @@ program
   .option('--email <email>', 'Git email (non-interactive)')
   .option('--branch <branch>', 'Main branch (non-interactive)')
   .option('--repo <path>', 'Repository path (non-interactive)')
+  .option('--git-provider <provider>', 'Git provider: github, gitlab, bitbucket (non-interactive)')
+  .option('--git-token <token>', 'Git provider access token for PR metrics (non-interactive)')
   .option('--jira-url <url>', 'Jira URL (non-interactive)')
   .option('--jira-email <email>', 'Jira email (non-interactive)')
   .option('--jira-token <token>', 'Jira token (non-interactive)')
@@ -64,13 +66,15 @@ program
   .option('--slack-token <token>', 'Slack bot token (non-interactive)')
   .option('--slack-channel <id>', 'Slack default channel/user ID (non-interactive)')
   .action(async (options) => {
-    if (options.clientName || options.username || options.email || options.jiraUrl || options.linearKey || options.supabaseUrl || options.slackToken) {
+    if (options.clientName || options.username || options.email || options.gitToken || options.jiraUrl || options.linearKey || options.supabaseUrl || options.slackToken) {
       await quickInitCommand({
         clientName: options.clientName,
         username: options.username,
         email: options.email,
         branch: options.branch,
         repo: options.repo,
+        gitProvider: options.gitProvider,
+        gitToken: options.gitToken,
         jiraUrl: options.jiraUrl,
         jiraEmail: options.jiraEmail,
         jiraToken: options.jiraToken,
@@ -188,6 +192,7 @@ program
       console.log(chalk.gray(`      Git: ${client.git.configured ? chalk.green('✓') : chalk.red('✗')} ${client.git.username || 'Not set'}`));
       
       const integrations: string[] = [];
+      if (client.gitIntegration?.configured) integrations.push(`${client.gitIntegration.provider} (PR API)`);
       if (client.jira.configured) integrations.push('Jira');
       if (client.linear.configured) integrations.push('Linear');
       if (client.supabase.configured) integrations.push('Supabase');
@@ -317,6 +322,7 @@ ${chalk.bold('Integrations:')}
 
 ${chalk.bold('Environment Variables:')}
   METRIX_GIT_USERNAME, METRIX_GIT_EMAIL, METRIX_MAIN_BRANCH
+  METRIX_GIT_PROVIDER (github|gitlab|bitbucket), METRIX_GIT_TOKEN
   JIRA_URL, JIRA_EMAIL, JIRA_TOKEN
   LINEAR_API_KEY
   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY

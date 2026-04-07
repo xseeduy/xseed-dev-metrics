@@ -12,6 +12,7 @@ import { format, differenceInDays, parseISO, addDays, subDays } from 'date-fns';
 import {
   getConfig,
   getJiraConfig,
+  getGitIntegrationConfig,
   getSupabaseConfig,
   getSlackConfig,
   getDataDir,
@@ -23,6 +24,7 @@ import {
   addRepository,
   findRepositoryOwners,
 } from '../config/integrations';
+import { fetchProviderPrStats, parseOwnerRepo } from '../integrations/git-provider/client';
 import { GitMetrics } from '../core/git-metrics';
 import { JiraClient } from '../integrations/jira/client';
 import { calculateJiraMetrics } from '../integrations/jira/metrics';
@@ -43,6 +45,8 @@ interface CollectedData {
   repository: string;
   repoName: string;
   user: { username: string; email: string };
+  /** Non-fatal warning from the PR API fetch (e.g. no token configured). */
+  prWarning?: string;
   gitMetrics: {
     summary: unknown;
     userStats: unknown;
@@ -51,6 +55,7 @@ interface CollectedData {
   };
   jiraMetrics?: unknown;
 }
+
 
 // ==========================================
 // Git Operations
@@ -112,6 +117,19 @@ function getRepoName(repoPath: string): string {
     return match ? match[1] : basename(repoPath);
   } catch {
     return basename(repoPath);
+  }
+}
+
+/** Returns the remote origin URL for a repo, or empty string on failure. */
+function getRemoteOriginUrl(repoPath: string): string {
+  try {
+    return execSync('git remote get-url origin', {
+      cwd: repoPath,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  } catch {
+    return '';
   }
 }
 
@@ -285,8 +303,20 @@ async function collectRepoMetrics(
   const filterOptions = isAllTime
     ? {}
     : { since: options.since, until: options.until };
-  const since = filterOptions.since ?? defaultSince;
-  const until = filterOptions.until ?? defaultUntil;
+  let since = filterOptions.since ?? defaultSince;
+  let until = filterOptions.until ?? defaultUntil;
+
+  // When collecting a single calendar day, include the full day window.
+  if (
+    !isAllTime &&
+    filterOptions.since &&
+    filterOptions.until &&
+    filterOptions.since === filterOptions.until &&
+    /^\d{4}-\d{2}-\d{2}$/.test(filterOptions.since)
+  ) {
+    since = `${filterOptions.since} 00:00:00`;
+    until = `${filterOptions.until} 23:59:59`;
+  }
   const period = getPeriodLabel(
     isAllTime,
     filterOptions.since,
@@ -294,6 +324,7 @@ async function collectRepoMetrics(
     defaultSince,
     defaultUntil
   );
+  const effectiveFilterOptions = isAllTime ? {} : { since, until };
 
   const author = options.authorOverride ?? gitConfig.username;
   const userEmail = options.authorOverride
@@ -306,7 +337,7 @@ async function collectRepoMetrics(
   const allBranches = [mainBranch, ...unmergedBranches];
   
   // Add branches to filter options for multi-branch collection
-  const multiBranchOptions = { ...filterOptions, branches: allBranches };
+  const multiBranchOptions = { ...effectiveFilterOptions, branches: allBranches };
 
   // Get general summary (repo-wide, no author filter) - from all branches
   const summary = metrics.getRepoSummary(multiBranchOptions);
@@ -318,6 +349,32 @@ async function collectRepoMetrics(
   const activity = metrics.getTimeStats({ ...multiBranchOptions, email: userEmail });
   // Get weekly trends (filter by email for accuracy) - from all branches
   const trends = metrics.getStatsByPeriod({ ...multiBranchOptions, email: userEmail }, 'week');
+  // Fetch PR stats from provider API (GitHub/GitLab/Bitbucket)
+  const gitIntegration = getGitIntegrationConfig();
+  const remoteUrl = getRemoteOriginUrl(repoPath);
+  const ownerRepo = remoteUrl ? parseOwnerRepo(remoteUrl) : null;
+
+  let prOpen = 0;
+  let prMerged = 0;
+  let prClosedNotMerged = 0;
+  let prWarning: string | undefined;
+
+  if (ownerRepo) {
+    const { stats, warning } = await fetchProviderPrStats(gitIntegration, {
+      owner: ownerRepo.owner,
+      repo: ownerRepo.repo,
+      author,
+      since: isAllTime ? undefined : since,
+      until: isAllTime ? undefined : until,
+      remoteUrl,
+    });
+    prOpen = stats.open;
+    prMerged = stats.merged;
+    prClosedNotMerged = stats.closedNotMerged;
+    prWarning = warning;
+  } else {
+    prWarning = 'Could not determine repository owner/name from remote URL — PR metrics skipped.';
+  }
 
   const data: CollectedData = {
     collectionId: randomUUID(),
@@ -326,7 +383,18 @@ async function collectRepoMetrics(
     repository: repoPath,
     repoName: getRepoName(repoPath),
     user: { username: author, email: userEmail },
-    gitMetrics: { summary, userStats, activity, trends },
+    prWarning,
+    gitMetrics: {
+      summary: {
+        ...summary,
+        prsOpen: prOpen,
+        prsMerged: prMerged,
+        prsClosedNotMerged: prClosedNotMerged,
+      },
+      userStats,
+      activity,
+      trends,
+    },
   };
 
   // Get Jira metrics if configured (use config email for assignee when no override)
@@ -380,6 +448,9 @@ function convertToCSV(data: CollectedData): string {
     lines.push(`git_summary,files_changed,${summary.totalFilesChanged || 0},count,`);
     lines.push(`git_summary,active_branches,${summary.activeBranches || 0},count,`);
     lines.push(`git_summary,current_branch,${summary.currentBranch || 'N/A'},text,`);
+    lines.push(`git_summary,prs_open,${summary.prsOpen || 0},count,`);
+    lines.push(`git_summary,prs_merged,${summary.prsMerged || 0},count,`);
+    lines.push(`git_summary,prs_closed_not_merged,${summary.prsClosedNotMerged || 0},count,`);
     
     // Branch metadata (for multi-branch collection)
     if (summary.branchesAnalyzed && Array.isArray(summary.branchesAnalyzed)) {
@@ -470,13 +541,15 @@ function saveCollectedData(
   data: CollectedData, 
   authorSlug?: string, 
   clientName?: string, 
-  outputFormat: 'json' | 'csv' = 'csv'
+  outputFormat: 'json' | 'csv' = 'csv',
+  dateSuffix?: string
 ): string {
   const dataDir = getDataDir(clientName);
   const extension = outputFormat === 'json' ? 'json' : 'csv';
-  const filename = authorSlug
-    ? `${repoName}_${authorSlug}.${extension}`
-    : `${repoName}.${extension}`;
+  const filenameParts = [repoName];
+  if (authorSlug) filenameParts.push(authorSlug);
+  if (dateSuffix) filenameParts.push(dateSuffix);
+  const filename = `${filenameParts.join('_')}.${extension}`;
   const filepath = join(dataDir, filename);
 
   data.fileName = filename;
@@ -575,6 +648,9 @@ function parseCSVToCollectedData(csvContent: string): CollectedData | null {
         if (metricName === 'total_commits') data.gitMetrics.summary.totalCommits = parseInt(value) || 0;
         else if (metricName === 'lines_added') data.gitMetrics.summary.totalLinesAdded = parseInt(value) || 0;
         else if (metricName === 'lines_deleted') data.gitMetrics.summary.totalLinesDeleted = parseInt(value) || 0;
+        else if (metricName === 'prs_open') data.gitMetrics.summary.prsOpen = parseInt(value) || 0;
+        else if (metricName === 'prs_merged') data.gitMetrics.summary.prsMerged = parseInt(value) || 0;
+        else if (metricName === 'prs_closed_not_merged') data.gitMetrics.summary.prsClosedNotMerged = parseInt(value) || 0;
       }
       // Git User
       else if (metricType === 'git_user') {
@@ -941,10 +1017,23 @@ export async function collectCommand(options: {
             authorOverride: singleUser ? undefined : username,
           });
 
-          if (options.save && !options.daysback) {
+          // Surface PR API warnings once (first occurrence per repo)
+          if (data.prWarning && !options.quiet) {
+            spinner.warn(chalk.yellow(`PR API: ${data.prWarning}`));
+            spinner.start();
+          }
+
+          if (options.save) {
             const authorSlug = singleUser ? undefined : authorToSlug(username);
             const outputFormat = options.format || 'csv';
-            const filepath = saveCollectedData(repoName, data, authorSlug, clientName, outputFormat);
+            const filepath = saveCollectedData(
+              repoName,
+              data,
+              authorSlug,
+              clientName,
+              outputFormat,
+              day ?? undefined
+            );
             filesSaved.push(filepath);
           }
 
@@ -1185,9 +1274,21 @@ export async function showCommand(options: {
     
     const git = entry.gitMetrics;
     if (git?.summary) {
-      const summary = git.summary as { totalCommits: number; totalLinesAdded: number; totalLinesDeleted: number };
+      const summary = git.summary as {
+        totalCommits: number;
+        totalLinesAdded: number;
+        totalLinesDeleted: number;
+        prsOpen?: number;
+        prsMerged?: number;
+        prsClosedNotMerged?: number;
+      };
       console.log(`    Commits: ${chalk.yellow(summary.totalCommits)}`);
       console.log(`    Lines: ${chalk.green(`+${summary.totalLinesAdded}`)} ${chalk.red(`-${summary.totalLinesDeleted}`)}`);
+      console.log(`    PRs: ${chalk.green(summary.prsOpen || 0)} open  ${chalk.cyan(summary.prsMerged || 0)} merged  ${chalk.gray(summary.prsClosedNotMerged || 0)} closed`);
+    }
+
+    if (entry.prWarning) {
+      console.log(chalk.yellow(`    PR warning: ${entry.prWarning}`));
     }
     
     if (entry.jiraMetrics) {

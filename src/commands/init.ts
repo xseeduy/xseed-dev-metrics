@@ -21,6 +21,7 @@ import {
   getClientConfig,
   getSlackConfig,
   GitConfig,
+  GitIntegrationConfig,
   JiraConfig,
   LinearConfig,
   SupabaseConfig,
@@ -252,6 +253,10 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
       console.log(`\n    ${chalk.bold(client.name)}${activeMarker}`);
       console.log(`      Repositories: ${client.repositories}`);
       console.log(`      Git: ${client.git.configured ? chalk.green('✓') : chalk.gray('✗')} ${client.git.username || 'Not set'}`);
+      const providerLabel = client.gitIntegration?.configured
+        ? chalk.green(`✓ ${client.gitIntegration.provider} PR API`)
+        : chalk.gray('No PR token');
+      console.log(`      Git Provider: ${providerLabel}`);
       console.log(`      Jira: ${client.jira.configured ? chalk.green('✓ Connected') : chalk.gray('Not configured')}`);
       console.log(`      Linear: ${client.linear.configured ? chalk.green('✓ Connected') : chalk.gray('Not configured')}`);
     }
@@ -332,7 +337,37 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     const gitProvider = gitProviderMap[providerChoice] || 'github';
     
     const mainBranch = await ask(rl, 'Main Branch (main/master)', detectedBranch);
-    
+
+    // Git provider token
+    const providerTokenUrls: Record<string, string> = {
+      github: 'https://github.com/settings/tokens/new?scopes=repo',
+      gitlab: 'https://gitlab.com/-/profile/personal_access_tokens',
+      bitbucket: 'https://bitbucket.org/account/settings/app-passwords/',
+    };
+    const providerTokenLabels: Record<string, string> = {
+      github: 'GitHub Personal Access Token (scopes: repo)',
+      gitlab: 'GitLab Personal Access Token (scopes: read_api)',
+      bitbucket: 'Bitbucket App Password (permissions: Pull requests - Read)',
+    };
+
+    console.log(chalk.gray(`\n  ${providerTokenLabels[gitProvider]} needed for PR metrics.`));
+    console.log(chalk.gray(`  Generate at: ${providerTokenUrls[gitProvider]}\n`));
+
+    const gitToken = await askPassword(rl, `${gitProvider.charAt(0).toUpperCase() + gitProvider.slice(1)} Token (leave blank to skip PR metrics)`);
+
+    let gitIntegrationConfig: GitIntegrationConfig | undefined;
+    if (gitToken) {
+      gitIntegrationConfig = { provider: gitProvider, token: gitToken };
+      printSuccess(`${gitProvider} token saved — PR metrics enabled.`);
+    } else {
+      console.log('');
+      console.log(chalk.bgYellow.black('  ⚠  WARNING                                                    '));
+      console.log(chalk.yellow('  No token provided. PR metrics (open / merged / closed)'));
+      console.log(chalk.yellow('  will NOT be collected until you configure one.'));
+      console.log(chalk.yellow(`  Run ${chalk.bold('metrix init --force')} at any time to add it.`));
+      console.log('');
+    }
+
     const gitConfig: GitConfig = {
       username: gitUsername,
       email: gitEmail,
@@ -565,6 +600,7 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     
     const clientConfig: ClientConfig = {
       git: gitConfig,
+      gitIntegration: gitIntegrationConfig,
       jira: jiraConfig,
       linear: linearConfig,
       repositories,
@@ -631,6 +667,8 @@ export async function quickInitCommand(options: {
   email?: string;
   branch?: string;
   repo?: string;
+  gitProvider?: string;
+  gitToken?: string;
   jiraUrl?: string;
   jiraEmail?: string;
   jiraToken?: string;
@@ -666,6 +704,16 @@ export async function quickInitCommand(options: {
     }
   }
   
+  if (options.gitProvider && options.gitToken) {
+    const validProviders = ['github', 'gitlab', 'bitbucket'];
+    if (validProviders.includes(options.gitProvider)) {
+      clientConfig.gitIntegration = {
+        provider: options.gitProvider as 'github' | 'gitlab' | 'bitbucket',
+        token: options.gitToken,
+      };
+    }
+  }
+
   if (options.jiraUrl && options.jiraEmail && options.jiraToken) {
     clientConfig.jira = {
       url: options.jiraUrl,
