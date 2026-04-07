@@ -52,6 +52,7 @@ interface CollectedData {
     userStats: unknown;
     activity: unknown;
     trends: unknown;
+    branchesWorkedOn?: string[];
   };
   jiraMetrics?: unknown;
 }
@@ -279,6 +280,30 @@ function getPeriodLabel(
 }
 
 // ==========================================
+// Branch Analysis
+// ==========================================
+
+function getBranchesWorkedOn(
+  repoPath: string,
+  email: string,
+  branches: string[],
+  since: string,
+  until: string,
+): string[] {
+  const worked: string[] = [];
+  for (const branch of branches) {
+    try {
+      const cmd = `git log ${branch} --author="${email}" --oneline --since="${since}" --until="${until}"`;
+      const out = execSync(cmd, { cwd: repoPath, encoding: 'utf-8', stdio: 'pipe' }).trim();
+      if (out) worked.push(branch);
+    } catch {
+      // branch may not exist locally — skip silently
+    }
+  }
+  return worked;
+}
+
+// ==========================================
 // Collect Metrics
 // ==========================================
 
@@ -376,6 +401,10 @@ async function collectRepoMetrics(
     prWarning = 'Could not determine repository owner/name from remote URL — PR metrics skipped.';
   }
 
+  const branchesWorkedOn = isAllTime
+    ? allBranches
+    : getBranchesWorkedOn(repoPath, userEmail, allBranches, since, until);
+
   const data: CollectedData = {
     collectionId: randomUUID(),
     collectedAt: now.toISOString(),
@@ -394,6 +423,7 @@ async function collectRepoMetrics(
       userStats,
       activity,
       trends,
+      branchesWorkedOn,
     },
   };
 
@@ -456,6 +486,15 @@ function convertToCSV(data: CollectedData): string {
     if (summary.branchesAnalyzed && Array.isArray(summary.branchesAnalyzed)) {
       lines.push(`git_summary,branches_analyzed,${summary.branchesAnalyzed.length},count,`);
       lines.push(`git_summary,branch_list,"${summary.branchesAnalyzed.join(', ')}",text,`);
+    }
+
+    // Branches where this user actually committed in this period
+    const branchesWorkedOn = data.gitMetrics.branchesWorkedOn;
+    if (Array.isArray(branchesWorkedOn)) {
+      lines.push(`git_summary,branches_worked_on,${branchesWorkedOn.length},count,`);
+      if (branchesWorkedOn.length > 0) {
+        lines.push(`git_summary,branches_worked_on_list,"${branchesWorkedOn.join(', ')}",text,`);
+      }
     }
     
     if (summary.firstCommitDate) {
@@ -1061,8 +1100,7 @@ export async function collectCommand(options: {
               await uploadGitMetrics(supabaseClient, {
                 engineerClientId: ecId,
                 repoName: data.repoName,
-                periodStart: day,
-                periodEnd: day,
+                day,
                 collectionId: data.collectionId,
                 gitMetrics: data.gitMetrics,
               });
