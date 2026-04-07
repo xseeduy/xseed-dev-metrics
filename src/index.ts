@@ -105,6 +105,7 @@ program
   .option('-q, --quiet', 'Minimal output')
   .option('--scheduled', 'Mark as scheduled run (used by cron)')
   .option('--upload', 'Upload metrics to Supabase (auto-enabled for scheduled runs)')
+  .option('--daysback <days>', 'Insert one daily row per day going back N days (e.g. --daysback 30)', (v) => parseInt(v, 10))
   .action(collectCommand);
 
 // ==========================================

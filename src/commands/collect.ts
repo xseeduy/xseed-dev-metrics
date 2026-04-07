@@ -8,7 +8,7 @@ import { randomUUID } from 'crypto';
 import { execSync } from 'child_process';
 import { existsSync, writeFileSync, readdirSync, readFileSync } from 'fs';
 import { join, basename } from 'path';
-import { format, differenceInDays, parseISO } from 'date-fns';
+import { format, differenceInDays, parseISO, addDays, subDays } from 'date-fns';
 import {
   getConfig,
   getJiraConfig,
@@ -280,7 +280,8 @@ async function collectRepoMetrics(
   const defaultSince = format(new Date(now.getTime() - DEFAULTS.COLLECTION_DAYS * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
   const defaultUntil = format(now, 'yyyy-MM-dd');
 
-  const isAllTime = options.total || (!options.since && !options.until);
+  // isAllTime only when --total is explicitly passed; callers always supply since/until for daily mode
+  const isAllTime = options.total === true;
   const filterOptions = isAllTime
     ? {}
     : { since: options.since, until: options.until };
@@ -590,6 +591,28 @@ function parseCSVToCollectedData(csvContent: string): CollectedData | null {
 }
 
 // ==========================================
+// Day Range Generator
+// ==========================================
+
+/**
+ * Returns an array of date strings (yyyy-MM-dd) for each calendar day
+ * from `since` to `until`, inclusive. Oldest day first.
+ *
+ * Example: generateDayRanges('2026-04-01', '2026-04-03')
+ *   → ['2026-04-01', '2026-04-02', '2026-04-03']
+ */
+function generateDayRanges(since: string, until: string): string[] {
+  const days: string[] = [];
+  let current = parseISO(since);
+  const end = parseISO(until);
+  while (current <= end) {
+    days.push(format(current, 'yyyy-MM-dd'));
+    current = addDays(current, 1);
+  }
+  return days;
+}
+
+// ==========================================
 // Collect Command
 // ==========================================
 
@@ -617,6 +640,8 @@ export async function collectCommand(options: {
   upload?: boolean;
   save?: boolean;
   format?: 'json' | 'csv';
+  /** Go back N days from today, inserting one row per day (oldest first). */
+  daysback?: number;
 }): Promise<void> {
   // Detect common mistake: using -authors instead of --usernames
   const args = process.argv.slice(2);
@@ -750,13 +775,26 @@ export async function collectCommand(options: {
     }
   }
 
-  const now = new Date();
-  const defaultSince = format(new Date(now.getTime() - DEFAULTS.COLLECTION_DAYS * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
-  const defaultUntil = format(now, 'yyyy-MM-dd');
-  const isAllTimeCollection = options.total || (!options.since && !options.until);
-  const filterOptions = isAllTimeCollection
+  const today = format(new Date(), 'yyyy-MM-dd');
+
+  // Build the ordered list of days to collect (one Supabase row per entry).
+  // --total skips this and does a single all-time pass.
+  let daysToCollect: string[];
+  if (options.total) {
+    daysToCollect = [];
+  } else if (options.daysback) {
+    const since = format(subDays(new Date(), options.daysback), 'yyyy-MM-dd');
+    daysToCollect = generateDayRanges(since, today);
+  } else if (options.since || options.until) {
+    daysToCollect = generateDayRanges(options.since ?? today, options.until ?? today);
+  } else {
+    daysToCollect = [today];
+  }
+
+  // Filter range used for author discovery (full span, not per-day)
+  const filterOptions = options.total
     ? {}
-    : { since: options.since, until: options.until };
+    : { since: daysToCollect[0] ?? today, until: daysToCollect[daysToCollect.length - 1] ?? today };
 
   // ==========================================
   // Supabase Upload Setup
@@ -880,70 +918,83 @@ export async function collectCommand(options: {
       }
 
       const filesSaved: string[] = [];
-      for (const username of usersToCollect) {
-        if (!singleUser && !options.quiet) {
-          spinner.text = `Collecting for ${chalk.bold(username)}...`;
-        } else {
-          spinner.text = 'Collecting Git metrics...';
-        }
+      let repoUploadCount = 0;
 
-        const data = await collectRepoMetrics(repoPath, gitConfig, {
-          total: options.total,
-          since: options.since,
-          until: options.until,
-          jiraProject: options.jira,
-          authorOverride: singleUser ? undefined : username,
-        });
+      // Iterate day-by-day (or single null entry for --total all-time pass)
+      const dayIterations: Array<string | null> = options.total
+        ? [null]
+        : daysToCollect;
 
-        if (options.save) {
-          const authorSlug = singleUser ? undefined : authorToSlug(username);
-          const outputFormat = options.format || 'csv';
-          const filepath = saveCollectedData(repoName, data, authorSlug, clientName, outputFormat);
-          filesSaved.push(filepath);
-        }
+      for (const day of dayIterations) {
+        for (const username of usersToCollect) {
+          if (!options.quiet) {
+            const userLabel = singleUser ? '' : ` · ${chalk.bold(username)}`;
+            const dayLabel = day ? ` · ${day}` : ' · all-time';
+            spinner.text = `Collecting${dayLabel}${userLabel}...`;
+          }
 
-        // Upload to Supabase if configured
-        if (supabaseClient && supabaseClientId) {
-          try {
-            // Look up engineer profile from config for extra fields
-            const engineerProfile = config.engineers?.find(
-              e => e.email.toLowerCase() === data.user.email.toLowerCase()
-            );
-            const engineerId = await supabaseClient.resolveEngineerId(
-              data.user.email,
-              data.user.username,
-              engineerProfile
-                ? { 
-                    gitUsername: engineerProfile.gitUsername, 
-                    gitProvider: engineerProfile.gitProvider,
-                    slackUser: engineerProfile.slackUser 
-                  }
-                : undefined
-            );
-            const ecId = await supabaseClient.resolveEngineerClientId(engineerId, supabaseClientId);
+          const data = await collectRepoMetrics(repoPath, gitConfig, {
+            total: options.total,
+            since: day ?? undefined,
+            until: day ?? undefined,
+            jiraProject: options.jira,
+            authorOverride: singleUser ? undefined : username,
+          });
 
-            await uploadGitMetrics(supabaseClient, {
-              engineerClientId: ecId,
-              repoName: data.repoName,
-              periodStart: data.period?.since || null,
-              periodEnd: data.period?.until || null,
-              collectionId: data.collectionId,
-              gitMetrics: data.gitMetrics,
-            });
+          if (options.save && !options.daysback) {
+            const authorSlug = singleUser ? undefined : authorToSlug(username);
+            const outputFormat = options.format || 'csv';
+            const filepath = saveCollectedData(repoName, data, authorSlug, clientName, outputFormat);
+            filesSaved.push(filepath);
+          }
 
-            if (data.jiraMetrics && (data.jiraMetrics as any).available !== false) {
-              await uploadIntegrationMetrics(supabaseClient, {
+          // Upload to Supabase — always insert even when activity is zero
+          if (supabaseClient && supabaseClientId) {
+            try {
+              const engineerProfile = config.engineers?.find(
+                e => e.email.toLowerCase() === data.user.email.toLowerCase()
+              );
+              const engineerId = await supabaseClient.resolveEngineerId(
+                data.user.email,
+                data.user.username,
+                engineerProfile
+                  ? {
+                      gitUsername: engineerProfile.gitUsername,
+                      gitProvider: engineerProfile.gitProvider,
+                      slackUser: engineerProfile.slackUser,
+                    }
+                  : undefined
+              );
+              const ecId = await supabaseClient.resolveEngineerClientId(engineerId, supabaseClientId);
+
+              // Use the explicit day for period_start/end so each day is a distinct row.
+              // For --total, period_start/end remain null (single all-time record).
+              await uploadGitMetrics(supabaseClient, {
                 engineerClientId: ecId,
-                source: 'jira',
-                metrics: data.jiraMetrics as Record<string, any>,
-                periodStart: data.period?.since || null,
-                periodEnd: data.period?.until || null,
+                repoName: data.repoName,
+                periodStart: day,
+                periodEnd: day,
+                collectionId: data.collectionId,
+                gitMetrics: data.gitMetrics,
               });
-            }
 
-            uploadCount++;
-          } catch (uploadErr) {
-            uploadErrors.push(`${data.repoName}/${username}: ${(uploadErr as Error).message}`);
+              if (data.jiraMetrics && (data.jiraMetrics as any).available !== false) {
+                await uploadIntegrationMetrics(supabaseClient, {
+                  engineerClientId: ecId,
+                  source: 'jira',
+                  metrics: data.jiraMetrics as Record<string, any>,
+                  periodStart: day,
+                  periodEnd: day,
+                });
+              }
+
+              uploadCount++;
+              repoUploadCount++;
+            } catch (uploadErr) {
+              uploadErrors.push(
+                `${data.repoName}/${username}${day ? ` (${day})` : ''}: ${(uploadErr as Error).message}`
+              );
+            }
           }
         }
       }
@@ -956,11 +1007,15 @@ export async function collectCommand(options: {
         branch: gitConfig.mainBranch,
       });
 
-      spinner.succeed(
-        singleUser
-          ? `${chalk.bold(repoName)}: Metrics collected`
-          : `${chalk.bold(repoName)}: ${usersToCollect.length} user(s) collected`
-      );
+      if (supabaseClient && repoUploadCount > 0) {
+        spinner.succeed(`${chalk.bold(repoName)}: ${repoUploadCount} row(s) uploaded`);
+      } else {
+        spinner.succeed(
+          singleUser
+            ? `${chalk.bold(repoName)}: Metrics collected`
+            : `${chalk.bold(repoName)}: ${usersToCollect.length} user(s) collected`
+        );
+      }
     } catch (error: unknown) {
       spinner.fail(`${chalk.bold(repoName)}: Failed`);
       results.push({ repo: repoName, success: false, error: (error as Error).message });
