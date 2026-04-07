@@ -12,14 +12,12 @@ export async function uploadGitMetrics(
   data: {
     engineerClientId: string;
     repoName: string;
-    periodStart: string | null;
-    periodEnd: string | null;
+    day: string | null;
     collectionId: string;
     gitMetrics: {
       summary: any;
       userStats: any;
       activity: any;
-      trends: any;
     };
   }
 ): Promise<{ id: string }> {
@@ -33,23 +31,18 @@ export async function uploadGitMetrics(
       {
         engineer_client_id: data.engineerClientId,
         repo_name: data.repoName,
-        period_start: data.periodStart || new Date().toISOString().split('T')[0],
-        period_end: data.periodEnd || new Date().toISOString().split('T')[0],
+        day: data.day || new Date().toISOString().split('T')[0],
         commits: userStats.commits || 0,
         lines_added: userStats.linesAdded || 0,
         lines_deleted: userStats.linesDeleted || 0,
         files_changed: userStats.filesChanged || 0,
-        active_days: userStats.activeDays || 0,
-        avg_commits_per_day: userStats.avgCommitsPerDay || 0,
         prs_open: summary.prsOpen || 0,
         prs_merged: summary.prsMerged || 0,
         prs_closed_not_merged: summary.prsClosedNotMerged || 0,
         activity_by_hour: activity.byHour || {},
-        activity_by_day: activity.byDayOfWeek || {},
-        weekly_trends: data.gitMetrics.trends || {},
         collection_id: data.collectionId,
       },
-      { onConflict: 'engineer_client_id,repo_name,period_start,period_end' }
+      { onConflict: 'engineer_client_id,repo_name,day' }
     )
     .select('id')
     .single();

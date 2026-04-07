@@ -1061,8 +1061,7 @@ export async function collectCommand(options: {
               await uploadGitMetrics(supabaseClient, {
                 engineerClientId: ecId,
                 repoName: data.repoName,
-                periodStart: day,
-                periodEnd: day,
+                day,
                 collectionId: data.collectionId,
                 gitMetrics: data.gitMetrics,
               });
