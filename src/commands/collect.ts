@@ -961,7 +961,17 @@ export async function collectCommand(options: {
     // Resolve list of users to collect for this repo
     let usersToCollect: string[];
     if (usernamesOption.type === 'none') {
-      usersToCollect = [gitConfig.username];
+      // When no --usernames flag is given, default to all configured engineers
+      // if any were set up during `metrix init`. Fall back to the git config user.
+      const trackedEngineers = config?.engineers;
+      if (trackedEngineers && trackedEngineers.length > 0) {
+        usersToCollect = trackedEngineers.map(e => e.fullName);
+        if (!options.quiet) {
+          console.log(chalk.gray(`  Using ${usersToCollect.length} configured engineer(s) from config.`));
+        }
+      } else {
+        usersToCollect = [gitConfig.username];
+      }
     } else if (usernamesOption.type === 'all') {
       const trackedEngineers = config?.engineers;
       if (trackedEngineers && trackedEngineers.length > 0) {
@@ -1012,7 +1022,7 @@ export async function collectCommand(options: {
       }
     }
 
-    const singleUser = usersToCollect.length === 1 && usersToCollect[0] === gitConfig.username && usernamesOption.type === 'none';
+    const singleUser = usersToCollect.length === 1 && usersToCollect[0] === gitConfig.username;
 
     // One spinner per repo when multi-user; per user when single
     const spinner = ora({

@@ -20,6 +20,7 @@ import {
   switchClient,
   getClientConfig,
   getSlackConfig,
+  getSupabaseConfig,
   GitConfig,
   GitIntegrationConfig,
   JiraConfig,
@@ -34,6 +35,7 @@ import { JiraClient } from '../integrations/jira/client';
 import { LinearClient } from '../integrations/linear/client';
 import { SlackNotifier } from '../notifications/slack';
 import { validateSlackUserId } from '../utils/validation';
+import { SupabaseMetricsClient } from '../integrations/supabase/client';
 
 // ==========================================
 // Readline Helper
@@ -615,7 +617,30 @@ export async function initCommand(options: { force?: boolean } = {}): Promise<vo
     };
     
     addClient(clientName, clientConfig, true);
-    
+
+    // Provision engineers in Supabase immediately so they exist before the
+    // first `metrix collect` run (rather than being created lazily per-row).
+    const supabaseConfig = getSupabaseConfig();
+    if (supabaseConfig && engineers.length > 0) {
+      console.log(chalk.gray('\n  Provisioning engineers in Supabase...'));
+      try {
+        const supabaseClient = new SupabaseMetricsClient(supabaseConfig);
+        const clientId = await supabaseClient.resolveClientId(clientName);
+        for (const eng of engineers) {
+          const engId = await supabaseClient.resolveEngineerId(
+            eng.email,
+            eng.fullName,
+            { gitUsername: eng.gitUsername, gitProvider: eng.gitProvider }
+          );
+          await supabaseClient.resolveEngineerClientId(engId, clientId);
+          console.log(chalk.gray(`    ✓ ${eng.fullName} <${eng.email}>`));
+        }
+        printSuccess(`${engineers.length} engineer(s) provisioned in Supabase.`);
+      } catch (err) {
+        printWarning(`Could not provision engineers in Supabase: ${(err as Error).message}`);
+      }
+    }
+
     printSuccess(`Client '${clientName}' configured and activated!`);
     console.log(chalk.gray(`\n  Config file: ${getConfigFilePath()}\n`));
     

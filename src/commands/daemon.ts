@@ -164,7 +164,7 @@ async function runDaemonMode(cronExpression: string): Promise<void> {
     // Run collection
     try {
       const { collectCommand } = await import('./collect');
-      await collectCommand({ all: true, pull: true, quiet: true, scheduled: true });
+      await collectCommand({ all: true, pull: true, quiet: true, scheduled: true, usernames: 'ALL' });
       
       try {
         appendFileSync(LOG_FILE, `[${timestamp}] Collection completed successfully\n`);
@@ -304,7 +304,7 @@ export async function daemonCommand(action: string): Promise<void> {
 
       // Import and run collect command
       const { collectCommand } = await import('./collect');
-      await collectCommand({ all: true });
+      await collectCommand({ all: true, usernames: 'ALL' });
       break;
     }
 
